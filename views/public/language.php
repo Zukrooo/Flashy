@@ -90,12 +90,14 @@
 								<?php if (!$isEmpty): ?>
 									<form
 											method="post"
-											action="/languages/<?= e((string)$language['id']) ?>/smart/<?= e($smartSet['key']) ?>/start">
+											action="<?= e($isPracticeMode
+												? '/practice/languages/' . (string) $language['id'] . '/smart/' . $smartSet['key'] . '/start'
+												: '/languages/' . (string) $language['id'] . '/smart/' . $smartSet['key'] . '/start') ?>">
 										<?= Csrf::input() ?>
 										<button
 												class="btn-secondary justify-center sm:w-auto"
 												type="submit">
-											Study
+											<?= e($isPracticeMode ? 'Practice' : 'Study') ?>
 										</button>
 									</form>
 								<?php endif; ?>
@@ -106,9 +108,8 @@
 			</div>
 		<?php else: ?>
 			<div class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-5 text-sm leading-6 text-slate-700">
-				<?= e($isPracticeMode
-					? 'Smart sets are not available in practice mode'
-					: 'You can study these sets as a guest right away. Create an account or log in to unlock smart sets based on your progress and keep your history.') ?>
+				You can study these sets as a guest right away. Create an account or log in to unlock smart sets based
+				on your progress and keep your history.
 			</div>
 		<?php endif; ?>
 

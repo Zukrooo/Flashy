@@ -14,9 +14,6 @@ $headerPills = $context['pills'] ?? [$context['subtitle'], $context['name']];
 $settingsTitle = (string) ($context['settings_title'] ?? 'Study Settings');
 $showStudyModeSettings = (bool) ($context['show_study_mode'] ?? true);
 $isPractice = (bool) ($context['is_practice'] ?? false);
-$showPracticeProgressSetting = (bool) ($context['show_practice_progress_setting'] ?? false);
-$practiceRecordsProgress = (bool) ($context['practice_records_progress'] ?? false);
-$practiceProgressPath = (string) ($context['practice_progress_path'] ?? '');
 $currentStudyMode = $context['study_mode'] ?? 'infinite';
 $studyModeOptions = [
     'infinite' => 'Infinite',
@@ -527,29 +524,6 @@ $summaryLabel = $currentStudyMode === 'finite'
                 </div>
             </div>
 
-            <?php if ($showPracticeProgressSetting && $practiceProgressPath !== ''): ?>
-                <div class="mt-8 border-t border-slate-200 pt-8">
-                    <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Smart Sets</h2>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                        Choose whether guesses made in practice should affect your smart sets. Off by default.
-                    </p>
-
-                    <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                        <?php foreach ([false => 'Off', true => 'On'] as $recordsProgressValue => $recordsProgressLabel): ?>
-                            <?php $isActive = $practiceRecordsProgress === (bool) $recordsProgressValue; ?>
-                            <form method="post" action="<?= e($practiceProgressPath) ?>">
-                                <?= Csrf::input() ?>
-                                <input type="hidden" name="records_progress" value="<?= $recordsProgressValue ? '1' : '0' ?>">
-                                <button
-                                        class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center"
-                                        type="submit">
-                                    <?= e($recordsProgressLabel) ?>
-                                </button>
-                            </form>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
 		</aside>
 	</div>
 </section>
@@ -662,29 +636,6 @@ $summaryLabel = $currentStudyMode === 'finite'
             </div>
         </div>
 
-        <?php if ($showPracticeProgressSetting && $practiceProgressPath !== ''): ?>
-            <div class="mt-8 border-t border-slate-200 pt-8">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Smart Sets</h2>
-                <p class="mt-3 text-sm leading-6 text-slate-600">
-                    Choose whether guesses made in practice should affect your smart sets. Off by default.
-                </p>
-
-                <div class="mt-6 grid grid-cols-1 gap-3">
-                    <?php foreach ([false => 'Off', true => 'On'] as $recordsProgressValue => $recordsProgressLabel): ?>
-                        <?php $isActive = $practiceRecordsProgress === (bool) $recordsProgressValue; ?>
-                        <form method="post" action="<?= e($practiceProgressPath) ?>">
-                            <?= Csrf::input() ?>
-                            <input type="hidden" name="records_progress" value="<?= $recordsProgressValue ? '1' : '0' ?>">
-                            <button
-                                    class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center"
-                                    type="submit">
-                                <?= e($recordsProgressLabel) ?>
-                            </button>
-                        </form>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
     </div>
 </div>
 

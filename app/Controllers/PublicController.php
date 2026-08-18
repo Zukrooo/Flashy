@@ -117,18 +117,33 @@ final class PublicController
         }
 
         $sets = $this->sets->allPublishedForLanguage($languageId);
+        $smartSets = [];
+        $userId = $this->auth->userId();
 
         if ($sets === []) {
             Flash::put('error', 'This language has no published sets yet.');
             redirect('/practice');
         }
 
+        if ($userId !== null) {
+            $counts = $this->progress->countsForLanguage($userId, $languageId);
+
+            foreach ($this->smartSetDefinitions() as $key => $definition) {
+                $smartSets[] = [
+                    'key' => $key,
+                    'name' => $definition['name'],
+                    'description' => $definition['description'],
+                    'count' => $counts[$key] ?? 0,
+                ];
+            }
+        }
+
         View::render('public/language', [
             'title' => 'Practice ' . $language['name'],
             'language' => $language,
             'sets' => $sets,
-            'smart_sets' => [],
-            'show_smart_sets' => false,
+            'smart_sets' => $smartSets,
+            'show_smart_sets' => $userId !== null,
             'is_practice_mode' => true,
         ]);
     }
@@ -178,18 +193,79 @@ final class PublicController
             redirect('/');
         }
 
-        $recordsProgress = $this->auth->checkUser() && isset($_POST['records_progress']) && $_POST['records_progress'] === '1';
-
         $this->studySession->start(
             $this->practiceSetSessionKey($setId),
             $cards,
             (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL),
             StudySession::STUDY_MODE_INFINITE,
             (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY),
-            $recordsProgress
+            false
         );
         $this->rememberStudy('/practice/set/' . $setId);
         redirect('/practice/set/' . $setId);
+    }
+
+    public function startPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+
+        $language = $this->languages->find($languageId);
+
+        if ($language === null || !$this->progress->isValidSmartSet($smartSet)) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Study set not found']);
+            return;
+        }
+
+        $cards = $this->progress->cardsForSmartSet($this->auth->userId() ?? 0, $languageId, $smartSet);
+
+        if ($cards === []) {
+            Flash::put('error', 'This smart study set is empty right now.');
+            redirect('/practice/languages/' . $languageId);
+        }
+
+        $path = '/practice/language/' . $languageId . '/smart/' . $smartSet;
+        $this->studySession->start(
+            $this->practiceSmartSessionKey($languageId, $smartSet),
+            $cards,
+            StudySession::MODE_BILINGUAL,
+            StudySession::STUDY_MODE_INFINITE,
+            (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY),
+            false
+        );
+        $this->rememberStudy($path);
+        redirect($path);
+    }
+
+    public function startPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $set = $this->sets->find($setId);
+
+        if ($set === null || (int) $set['published'] !== 1 || !$this->progress->isValidSmartSet($smartSet)) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Study set not found']);
+            return;
+        }
+
+        $cards = $this->progress->cardsForSetSmartSet($this->auth->userId() ?? 0, $setId, $smartSet);
+
+        if ($cards === []) {
+            Flash::put('error', 'This smart study set is empty right now.');
+            redirect('/practice/sets/' . $setId);
+        }
+
+        $path = '/practice/set/' . $setId . '/smart/' . $smartSet;
+        $this->studySession->start(
+            $this->practiceSetSmartSessionKey($setId, $smartSet),
+            $cards,
+            StudySession::MODE_BILINGUAL,
+            StudySession::STUDY_MODE_INFINITE,
+            (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY),
+            false
+        );
+        $this->rememberStudy($path);
+        redirect($path);
     }
 
     public function set(int $setId): void
@@ -246,6 +322,8 @@ final class PublicController
     {
         $set = $this->sets->find($setId);
         $cards = $this->cards->forSet($setId);
+        $smartSets = [];
+        $userId = $this->auth->userId();
 
         if ($set === null || (int) $set['published'] !== 1) {
             http_response_code(404);
@@ -258,12 +336,25 @@ final class PublicController
             redirect('/practice/languages/' . $set['language_id']);
         }
 
+        if ($userId !== null) {
+            $counts = $this->progress->countsForSet($userId, $setId);
+
+            foreach ($this->smartSetDefinitions() as $key => $definition) {
+                $smartSets[] = [
+                    'key' => $key,
+                    'name' => $definition['name'],
+                    'description' => $definition['description'],
+                    'count' => $counts[$key] ?? 0,
+                ];
+            }
+        }
+
         View::render('public/set', [
             'title' => 'Practice ' . $set['name'],
             'set' => $set,
             'card_count' => count($cards),
-            'smart_sets' => [],
-            'show_smart_sets' => false,
+            'smart_sets' => $smartSets,
+            'show_smart_sets' => $userId !== null,
             'finite_set_stat' => null,
             'is_practice_mode' => true,
         ]);
@@ -440,9 +531,100 @@ final class PublicController
                 'restart_path' => '/practice/sets/' . $setId . '/start',
                 'finish_path' => '/sets/' . $setId,
                 'is_practice' => true,
-                'practice_progress_path' => '/practice/set/' . $setId . '/smart-set-influence',
-                'practice_records_progress' => $this->auth->checkUser() && $this->studySession->recordsProgress($sessionKey),
-                'show_practice_progress_setting' => $this->auth->checkUser(),
+            ],
+            'card' => $currentCard,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function practiceSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+
+        $language = $this->languages->find($languageId);
+        $cards = $this->progress->cardsForSmartSet($this->auth->userId() ?? 0, $languageId, $smartSet);
+        $sessionKey = $this->practiceSmartSessionKey($languageId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $cards);
+        $this->studySession->lockMode($sessionKey, StudySession::MODE_BILINGUAL);
+        $currentCard = $this->studySession->current($sessionKey);
+        $summary = $this->studySession->summary($sessionKey);
+
+        if ($language === null || !$this->progress->isValidSmartSet($smartSet) || $currentCard === null) {
+            redirect('/practice/languages/' . $languageId);
+        }
+
+        $path = '/practice/language/' . $languageId . '/smart/' . $smartSet;
+        $this->rememberStudy($path);
+
+        View::render('public/study', [
+            'title' => 'Practice ' . $language['name'],
+            'context' => [
+                'name' => $this->smartSetDefinitions()[$smartSet]['name'],
+                'subtitle' => $language['name'],
+                'scope_label' => 'Smart set',
+                'pills' => [$language['name']],
+                'scope_detail' => $this->smartSetDefinitions()[$smartSet]['description'],
+                'back_path' => '/practice/languages/' . $languageId,
+                'answer_path' => $path . '/answer',
+                'session_key' => $sessionKey,
+                'mode' => $this->studySession->mode($sessionKey),
+                'mode_path' => $path . '/mode',
+                'show_translation_modes' => false,
+                'show_study_mode' => false,
+                'settings_title' => 'Practice Settings',
+                'study_mode' => StudySession::STUDY_MODE_INFINITE,
+                'wrong_mode' => $this->studySession->wrongMode($sessionKey),
+                'wrong_mode_path' => $path . '/wrong-mode',
+                'reset_path' => $path . '/reset',
+                'finish_path' => '/practice/languages/' . $languageId,
+                'is_practice' => true,
+            ],
+            'card' => $currentCard,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function practiceSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+
+        $set = $this->sets->find($setId);
+        $cards = $this->progress->cardsForSetSmartSet($this->auth->userId() ?? 0, $setId, $smartSet);
+        $sessionKey = $this->practiceSetSmartSessionKey($setId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $cards);
+        $this->studySession->lockMode($sessionKey, StudySession::MODE_BILINGUAL);
+        $currentCard = $this->studySession->current($sessionKey);
+        $summary = $this->studySession->summary($sessionKey);
+
+        if ($set === null || (int) $set['published'] !== 1 || !$this->progress->isValidSmartSet($smartSet) || $currentCard === null) {
+            redirect('/practice/sets/' . $setId);
+        }
+
+        $path = '/practice/set/' . $setId . '/smart/' . $smartSet;
+        $this->rememberStudy($path);
+
+        View::render('public/study', [
+            'title' => 'Practice ' . $set['name'],
+            'context' => [
+                'name' => $this->smartSetDefinitions()[$smartSet]['name'],
+                'subtitle' => $set['language_name'],
+                'scope_label' => 'Smart set',
+                'pills' => [$set['language_name'], $set['name']],
+                'scope_detail' => $this->smartSetDefinitions()[$smartSet]['description'],
+                'back_path' => '/practice/sets/' . $setId,
+                'answer_path' => $path . '/answer',
+                'session_key' => $sessionKey,
+                'mode' => $this->studySession->mode($sessionKey),
+                'mode_path' => $path . '/mode',
+                'show_translation_modes' => false,
+                'show_study_mode' => false,
+                'settings_title' => 'Practice Settings',
+                'study_mode' => StudySession::STUDY_MODE_INFINITE,
+                'wrong_mode' => $this->studySession->wrongMode($sessionKey),
+                'wrong_mode_path' => $path . '/wrong-mode',
+                'reset_path' => $path . '/reset',
+                'finish_path' => '/practice/sets/' . $setId,
+                'is_practice' => true,
             ],
             'card' => $currentCard,
             'summary' => $summary,
@@ -607,6 +789,22 @@ final class PublicController
         $this->handleAnswerResponse($sessionKey, (string) ($_POST['answer'] ?? ''), '/practice/set/' . $setId);
     }
 
+    public function answerPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $sessionKey = $this->practiceSmartSessionKey($languageId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $this->progress->cardsForSmartSet($this->auth->userId() ?? 0, $languageId, $smartSet));
+        $this->handleAnswerResponse($sessionKey, (string) ($_POST['answer'] ?? ''), '/practice/language/' . $languageId . '/smart/' . $smartSet);
+    }
+
+    public function answerPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $sessionKey = $this->practiceSetSmartSessionKey($setId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $this->progress->cardsForSetSmartSet($this->auth->userId() ?? 0, $setId, $smartSet));
+        $this->handleAnswerResponse($sessionKey, (string) ($_POST['answer'] ?? ''), '/practice/set/' . $setId . '/smart/' . $smartSet);
+    }
+
     public function answerLanguageAll(int $languageId): void
     {
         $this->studySession->syncCards($this->allSessionKey($languageId), $this->sets->cardsForPublishedLanguage($languageId));
@@ -640,6 +838,22 @@ final class PublicController
         $sessionKey = $this->practiceSetSessionKey($setId);
         $this->studySession->syncCards($sessionKey, $this->cards->forSet($setId));
         $this->handleSkipResponse($sessionKey, '/practice/set/' . $setId);
+    }
+
+    public function skipPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $sessionKey = $this->practiceSmartSessionKey($languageId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $this->progress->cardsForSmartSet($this->auth->userId() ?? 0, $languageId, $smartSet));
+        $this->handleSkipResponse($sessionKey, '/practice/language/' . $languageId . '/smart/' . $smartSet);
+    }
+
+    public function skipPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $sessionKey = $this->practiceSetSmartSessionKey($setId, $smartSet);
+        $this->studySession->syncCards($sessionKey, $this->progress->cardsForSetSmartSet($this->auth->userId() ?? 0, $setId, $smartSet));
+        $this->handleSkipResponse($sessionKey, '/practice/set/' . $setId . '/smart/' . $smartSet);
     }
 
     public function skipLanguageAll(int $languageId): void
@@ -682,6 +896,26 @@ final class PublicController
         unset($_SESSION['last_result'][$sessionKey]);
         $this->forgetStudy($path);
         redirect('/sets/' . $setId);
+    }
+
+    public function resetPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $path = '/practice/language/' . $languageId . '/smart/' . $smartSet;
+        $sessionKey = $this->practiceSmartSessionKey($languageId, $smartSet);
+        $this->studySession->clear($sessionKey);
+        unset($_SESSION['last_result'][$sessionKey]);
+        $this->forgetStudy($path);
+        redirect('/practice/languages/' . $languageId);
+    }
+
+    public function resetPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $path = '/practice/set/' . $setId . '/smart/' . $smartSet;
+        $sessionKey = $this->practiceSetSmartSessionKey($setId, $smartSet);
+        $this->studySession->clear($sessionKey);
+        unset($_SESSION['last_result'][$sessionKey]);
+        $this->forgetStudy($path);
+        redirect('/practice/sets/' . $setId);
     }
 
     public function resetLanguageAll(int $languageId): void
@@ -818,6 +1052,20 @@ final class PublicController
         redirect('/practice/set/' . $setId);
     }
 
+    public function setModeForPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->lockMode($this->practiceSmartSessionKey($languageId, $smartSet), StudySession::MODE_BILINGUAL);
+        redirect('/practice/language/' . $languageId . '/smart/' . $smartSet);
+    }
+
+    public function setModeForPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->lockMode($this->practiceSetSmartSessionKey($setId, $smartSet), StudySession::MODE_BILINGUAL);
+        redirect('/practice/set/' . $setId . '/smart/' . $smartSet);
+    }
+
     public function setStudyModeForSet(int $setId): void
     {
         $this->studySession->setStudyMode($this->setSessionKey($setId), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
@@ -834,6 +1082,20 @@ final class PublicController
     {
         $this->studySession->setWrongMode($this->practiceSetSessionKey($setId), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
         redirect('/practice/set/' . $setId);
+    }
+
+    public function setWrongModeForPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->setWrongMode($this->practiceSmartSessionKey($languageId, $smartSet), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/language/' . $languageId . '/smart/' . $smartSet);
+    }
+
+    public function setWrongModeForPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->setWrongMode($this->practiceSetSmartSessionKey($setId, $smartSet), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/set/' . $setId . '/smart/' . $smartSet);
     }
 
     public function setModeForLanguageAll(int $languageId): void
@@ -887,13 +1149,6 @@ final class PublicController
         $this->auth->requireUser();
         $this->studySession->setStudyMode($this->setSmartSessionKey($setId, $smartSet), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
         redirect('/study/set/' . $setId . '/smart/' . $smartSet);
-    }
-
-    public function setPracticeSmartSetInfluence(int $setId): void
-    {
-        $recordsProgress = $this->auth->checkUser() && isset($_POST['records_progress']) && $_POST['records_progress'] === '1';
-        $this->studySession->setRecordsProgress($this->practiceSetSessionKey($setId), $recordsProgress);
-        redirect('/practice/set/' . $setId);
     }
 
     public function setWrongModeForSetSmartSet(int $setId, string $smartSet): void
@@ -1043,6 +1298,16 @@ final class PublicController
     private function practiceSetSessionKey(int $setId): string
     {
         return 'practice-set-' . $setId;
+    }
+
+    private function practiceSmartSessionKey(int $languageId, string $smartSet): string
+    {
+        return 'practice-language-smart-' . $languageId . '-' . $smartSet;
+    }
+
+    private function practiceSetSmartSessionKey(int $setId, string $smartSet): string
+    {
+        return 'practice-set-smart-' . $setId . '-' . $smartSet;
     }
 
     private function allSessionKey(int $languageId): string

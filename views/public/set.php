@@ -108,12 +108,14 @@
 								<?php if (!$isEmpty): ?>
 									<form
 											method="post"
-											action="/sets/<?= e((string)$set['id']) ?>/smart/<?= e($smartSet['key']) ?>/start">
+											action="<?= e($isPracticeMode
+												? '/practice/sets/' . (string) $set['id'] . '/smart/' . $smartSet['key'] . '/start'
+												: '/sets/' . (string) $set['id'] . '/smart/' . $smartSet['key'] . '/start') ?>">
 										<?= Csrf::input() ?>
 										<button
 												class="btn-secondary justify-center sm:w-auto"
 												type="submit">
-											Study
+											<?= e($isPracticeMode ? 'Practice' : 'Study') ?>
 										</button>
 									</form>
 								<?php endif; ?>
