@@ -183,6 +183,9 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 						href="/">Language</a>
 				<a
 						class="btn-secondary w-full cursor-pointer sm:w-auto"
+						href="/practice">Practice</a>
+				<a
+						class="btn-secondary w-full cursor-pointer sm:w-auto"
 						href="<?= e($studyHref) ?>">Study</a>
 				<?php if ($userEmail !== null): ?>
 					<div class="profile-menu">
@@ -256,6 +259,9 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 						<a
 								class="btn-secondary w-full cursor-pointer justify-center"
 								href="/">Language</a>
+						<a
+								class="btn-secondary w-full cursor-pointer justify-center"
+								href="/practice">Practice</a>
 						<a
 								class="btn-secondary w-full cursor-pointer justify-center"
 								href="<?= e($studyHref) ?>">Study</a>

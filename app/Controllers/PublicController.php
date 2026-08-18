@@ -40,6 +40,22 @@ final class PublicController
             'title' => 'Learn Languages',
             'languages' => $languages,
             'is_logged_in' => $this->auth->checkUser(),
+            'is_practice_mode' => false,
+        ]);
+    }
+
+    public function practiceHome(): void
+    {
+        $languages = array_values(array_filter(
+            $this->languages->allWithCounts(true),
+            static fn (array $language): bool => (int) $language['set_count'] > 0
+        ));
+
+        View::render('public/home', [
+            'title' => 'Practice Languages',
+            'languages' => $languages,
+            'is_logged_in' => $this->auth->checkUser(),
+            'is_practice_mode' => true,
         ]);
     }
 
@@ -86,6 +102,34 @@ final class PublicController
             'sets' => $sets,
             'smart_sets' => $smartSets,
             'show_smart_sets' => $userId !== null,
+            'is_practice_mode' => false,
+        ]);
+    }
+
+    public function practiceLanguage(int $languageId): void
+    {
+        $language = $this->languages->find($languageId);
+
+        if ($language === null) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Language not found']);
+            return;
+        }
+
+        $sets = $this->sets->allPublishedForLanguage($languageId);
+
+        if ($sets === []) {
+            Flash::put('error', 'This language has no published sets yet.');
+            redirect('/practice');
+        }
+
+        View::render('public/language', [
+            'title' => 'Practice ' . $language['name'],
+            'language' => $language,
+            'sets' => $sets,
+            'smart_sets' => [],
+            'show_smart_sets' => false,
+            'is_practice_mode' => true,
         ]);
     }
 
@@ -110,11 +154,42 @@ final class PublicController
             $this->setSessionKey($setId),
             $cards,
             (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL),
-            (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE),
+            $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE)),
             (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY)
         );
         $this->rememberStudy('/study/set/' . $setId);
         redirect('/study/set/' . $setId);
+    }
+
+    public function startPracticeSet(int $setId): void
+    {
+        $set = $this->sets->find($setId);
+
+        if ($set === null || (int) $set['published'] !== 1) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Set not found']);
+            return;
+        }
+
+        $cards = $this->cards->forSet($setId);
+
+        if ($cards === []) {
+            Flash::put('error', 'This set has no cards yet.');
+            redirect('/');
+        }
+
+        $recordsProgress = $this->auth->checkUser() && isset($_POST['records_progress']) && $_POST['records_progress'] === '1';
+
+        $this->studySession->start(
+            $this->practiceSetSessionKey($setId),
+            $cards,
+            (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL),
+            StudySession::STUDY_MODE_INFINITE,
+            (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY),
+            $recordsProgress
+        );
+        $this->rememberStudy('/practice/set/' . $setId);
+        redirect('/practice/set/' . $setId);
     }
 
     public function set(int $setId): void
@@ -163,6 +238,34 @@ final class PublicController
             'smart_sets' => $smartSets,
             'show_smart_sets' => $userId !== null,
             'finite_set_stat' => $finiteSetStat,
+            'is_practice_mode' => false,
+        ]);
+    }
+
+    public function practiceSetLanding(int $setId): void
+    {
+        $set = $this->sets->find($setId);
+        $cards = $this->cards->forSet($setId);
+
+        if ($set === null || (int) $set['published'] !== 1) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Set not found']);
+            return;
+        }
+
+        if ($cards === []) {
+            Flash::put('error', 'This set has no cards yet.');
+            redirect('/practice/languages/' . $set['language_id']);
+        }
+
+        View::render('public/set', [
+            'title' => 'Practice ' . $set['name'],
+            'set' => $set,
+            'card_count' => count($cards),
+            'smart_sets' => [],
+            'show_smart_sets' => false,
+            'finite_set_stat' => null,
+            'is_practice_mode' => true,
         ]);
     }
 
@@ -187,7 +290,7 @@ final class PublicController
             $this->allSessionKey($languageId),
             $cards,
             (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL),
-            (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE),
+            $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE)),
             (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY)
         );
         $this->rememberStudy('/study/language/' . $languageId . '/all');
@@ -217,7 +320,7 @@ final class PublicController
             $this->smartSessionKey($languageId, $smartSet),
             $cards,
             StudySession::MODE_BILINGUAL,
-            (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE),
+            $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE)),
             (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY)
         );
         $this->rememberStudy('/study/language/' . $languageId . '/smart/' . $smartSet);
@@ -247,7 +350,7 @@ final class PublicController
             $this->setSmartSessionKey($setId, $smartSet),
             $cards,
             StudySession::MODE_BILINGUAL,
-            (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE),
+            $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_FINITE)),
             (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY)
         );
         $this->rememberStudy($path);
@@ -295,6 +398,51 @@ final class PublicController
                 'best_finite_time_seconds' => ($this->auth->userId() !== null
                     ? (int) (($this->progress->finiteSetStat($this->auth->userId(), $setId)['best_time_seconds'] ?? 0))
                     : 0),
+            ],
+            'card' => $currentCard,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function practiceSet(int $setId): void
+    {
+        $set = $this->sets->find($setId);
+        $cards = $this->cards->forSet($setId);
+        $sessionKey = $this->practiceSetSessionKey($setId);
+        $this->studySession->syncCards($sessionKey, $cards);
+        $currentCard = $this->studySession->current($sessionKey);
+        $summary = $this->studySession->summary($sessionKey);
+
+        if ($set === null || $currentCard === null) {
+            redirect('/sets/' . $setId);
+        }
+
+        $this->rememberStudy('/practice/set/' . $setId);
+
+        View::render('public/study', [
+            'title' => 'Practice ' . $set['name'],
+            'context' => [
+                'name' => $set['name'],
+                'subtitle' => $set['language_name'],
+                'scope_label' => 'Practice set',
+                'pills' => [$set['language_name'], $set['name']],
+                'back_path' => '/sets/' . $setId,
+                'answer_path' => '/practice/set/' . $setId . '/answer',
+                'session_key' => $sessionKey,
+                'mode' => $this->studySession->mode($sessionKey),
+                'mode_path' => '/practice/set/' . $setId . '/mode',
+                'show_study_mode' => false,
+                'settings_title' => 'Practice Settings',
+                'study_mode' => StudySession::STUDY_MODE_INFINITE,
+                'wrong_mode' => $this->studySession->wrongMode($sessionKey),
+                'wrong_mode_path' => '/practice/set/' . $setId . '/wrong-mode',
+                'reset_path' => '/practice/set/' . $setId . '/reset',
+                'restart_path' => '/practice/sets/' . $setId . '/start',
+                'finish_path' => '/sets/' . $setId,
+                'is_practice' => true,
+                'practice_progress_path' => '/practice/set/' . $setId . '/smart-set-influence',
+                'practice_records_progress' => $this->auth->checkUser() && $this->studySession->recordsProgress($sessionKey),
+                'show_practice_progress_setting' => $this->auth->checkUser(),
             ],
             'card' => $currentCard,
             'summary' => $summary,
@@ -452,6 +600,13 @@ final class PublicController
         $this->handleAnswerResponse($this->setSessionKey($setId), (string) ($_POST['answer'] ?? ''), '/study/set/' . $setId, $setId);
     }
 
+    public function answerPracticeSet(int $setId): void
+    {
+        $sessionKey = $this->practiceSetSessionKey($setId);
+        $this->studySession->syncCards($sessionKey, $this->cards->forSet($setId));
+        $this->handleAnswerResponse($sessionKey, (string) ($_POST['answer'] ?? ''), '/practice/set/' . $setId);
+    }
+
     public function answerLanguageAll(int $languageId): void
     {
         $this->studySession->syncCards($this->allSessionKey($languageId), $this->sets->cardsForPublishedLanguage($languageId));
@@ -480,6 +635,13 @@ final class PublicController
         $this->handleSkipResponse($this->setSessionKey($setId), '/study/set/' . $setId, $setId);
     }
 
+    public function skipPracticeSet(int $setId): void
+    {
+        $sessionKey = $this->practiceSetSessionKey($setId);
+        $this->studySession->syncCards($sessionKey, $this->cards->forSet($setId));
+        $this->handleSkipResponse($sessionKey, '/practice/set/' . $setId);
+    }
+
     public function skipLanguageAll(int $languageId): void
     {
         $this->studySession->syncCards($this->allSessionKey($languageId), $this->sets->cardsForPublishedLanguage($languageId));
@@ -506,6 +668,16 @@ final class PublicController
     {
         $path = '/study/set/' . $setId;
         $sessionKey = $this->setSessionKey($setId);
+        $this->studySession->clear($sessionKey);
+        unset($_SESSION['last_result'][$sessionKey]);
+        $this->forgetStudy($path);
+        redirect('/sets/' . $setId);
+    }
+
+    public function resetPracticeSet(int $setId): void
+    {
+        $path = '/practice/set/' . $setId;
+        $sessionKey = $this->practiceSetSessionKey($setId);
         $this->studySession->clear($sessionKey);
         unset($_SESSION['last_result'][$sessionKey]);
         $this->forgetStudy($path);
@@ -640,9 +812,15 @@ final class PublicController
         redirect('/study/set/' . $setId);
     }
 
+    public function setModeForPracticeSet(int $setId): void
+    {
+        $this->studySession->setMode($this->practiceSetSessionKey($setId), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
+        redirect('/practice/set/' . $setId);
+    }
+
     public function setStudyModeForSet(int $setId): void
     {
-        $this->studySession->setStudyMode($this->setSessionKey($setId), (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE));
+        $this->studySession->setStudyMode($this->setSessionKey($setId), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
         redirect('/study/set/' . $setId);
     }
 
@@ -650,6 +828,12 @@ final class PublicController
     {
         $this->studySession->setWrongMode($this->setSessionKey($setId), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
         redirect('/study/set/' . $setId);
+    }
+
+    public function setWrongModeForPracticeSet(int $setId): void
+    {
+        $this->studySession->setWrongMode($this->practiceSetSessionKey($setId), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/set/' . $setId);
     }
 
     public function setModeForLanguageAll(int $languageId): void
@@ -660,7 +844,7 @@ final class PublicController
 
     public function setStudyModeForLanguageAll(int $languageId): void
     {
-        $this->studySession->setStudyMode($this->allSessionKey($languageId), (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE));
+        $this->studySession->setStudyMode($this->allSessionKey($languageId), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
         redirect('/study/language/' . $languageId . '/all');
     }
 
@@ -680,7 +864,7 @@ final class PublicController
     public function setStudyModeForSmartSet(int $languageId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->setStudyMode($this->smartSessionKey($languageId, $smartSet), (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE));
+        $this->studySession->setStudyMode($this->smartSessionKey($languageId, $smartSet), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
         redirect('/study/language/' . $languageId . '/smart/' . $smartSet);
     }
 
@@ -701,8 +885,15 @@ final class PublicController
     public function setStudyModeForSetSmartSet(int $setId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->setStudyMode($this->setSmartSessionKey($setId, $smartSet), (string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE));
+        $this->studySession->setStudyMode($this->setSmartSessionKey($setId, $smartSet), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
         redirect('/study/set/' . $setId . '/smart/' . $smartSet);
+    }
+
+    public function setPracticeSmartSetInfluence(int $setId): void
+    {
+        $recordsProgress = $this->auth->checkUser() && isset($_POST['records_progress']) && $_POST['records_progress'] === '1';
+        $this->studySession->setRecordsProgress($this->practiceSetSessionKey($setId), $recordsProgress);
+        redirect('/practice/set/' . $setId);
     }
 
     public function setWrongModeForSetSmartSet(int $setId, string $smartSet): void
@@ -723,7 +914,7 @@ final class PublicController
             redirect($redirectPath);
         }
 
-        $this->recordProgress($result);
+        $this->recordProgress($sessionKey, $result);
         $currentCard = $this->studySession->current($sessionKey);
         $summary = $this->studySession->summary($sessionKey);
         $summary = $summary !== null && $setId !== null
@@ -760,7 +951,7 @@ final class PublicController
             redirect($redirectPath);
         }
 
-        $this->recordProgress($result);
+        $this->recordProgress($sessionKey, $result);
         $currentCard = $this->studySession->current($sessionKey);
         $summary = $this->studySession->summary($sessionKey);
         $summary = $summary !== null && $setId !== null
@@ -786,11 +977,15 @@ final class PublicController
         redirect($redirectPath);
     }
 
-    private function recordProgress(array $result): void
+    private function recordProgress(string $sessionKey, array $result): void
     {
         $userId = $this->auth->userId();
 
         if ($userId === null || !isset($result['card_id'])) {
+            return;
+        }
+
+        if (!$this->studySession->recordsProgress($sessionKey)) {
             return;
         }
 
@@ -843,6 +1038,11 @@ final class PublicController
     private function setSessionKey(int $setId): string
     {
         return 'set-' . $setId;
+    }
+
+    private function practiceSetSessionKey(int $setId): string
+    {
+        return 'practice-set-' . $setId;
     }
 
     private function allSessionKey(int $languageId): string
@@ -904,6 +1104,13 @@ final class PublicController
             : $previousBest;
 
         return $summary;
+    }
+
+    private function sanitizeStudyMode(string $studyMode): string
+    {
+        return $studyMode === StudySession::STUDY_MODE_FINITE
+            ? StudySession::STUDY_MODE_FINITE
+            : StudySession::STUDY_MODE_INFINITE;
     }
 
     private function smartSetDefinitions(): array

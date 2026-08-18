@@ -93,6 +93,11 @@ try {
         return;
     }
 
+    if ($method === 'GET' && $path === '/practice') {
+        $dispatch(static fn () => $publicController->practiceHome());
+        return;
+    }
+
     if ($method === 'GET' && $path === '/login') {
         $dispatch(static fn () => $publicAuthController->showLogin());
         return;
@@ -143,13 +148,28 @@ try {
         return;
     }
 
+    if ($method === 'GET' && preg_match('#^/practice/sets/(\d+)$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->practiceSetLanding((int) $matches[1]));
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/sets/(\d+)/smart/([a-z-]+)/start$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->startSetSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/sets/(\d+)/start$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->startPracticeSet((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'GET' && preg_match('#^/languages/(\d+)$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->language((int) $matches[1]));
+        return;
+    }
+
+    if ($method === 'GET' && preg_match('#^/practice/languages/(\d+)$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->practiceLanguage((int) $matches[1]));
         return;
     }
 
@@ -165,6 +185,11 @@ try {
 
     if ($method === 'GET' && preg_match('#^/study/set/(\d+)$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->studySet((int) $matches[1]));
+        return;
+    }
+
+    if ($method === 'GET' && preg_match('#^/practice/set/(\d+)$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->practiceSet((int) $matches[1]));
         return;
     }
 
@@ -188,6 +213,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/answer$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->answerPracticeSet((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/smart/([a-z-]+)/answer$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->answerSetSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
@@ -195,6 +225,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/skip$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->skipSet((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/skip$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->skipPracticeSet((int) $matches[1]), false, true);
         return;
     }
 
@@ -208,6 +243,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/mode$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setModeForPracticeSet((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/study-mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setStudyModeForSet((int) $matches[1]), false, true);
         return;
@@ -215,6 +255,16 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/wrong-mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setWrongModeForSet((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/wrong-mode$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setWrongModeForPracticeSet((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/smart-set-influence$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setPracticeSmartSetInfluence((int) $matches[1]), false, true);
         return;
     }
 
@@ -305,6 +355,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/reset$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->resetSet((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/reset$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->resetPracticeSet((int) $matches[1]), false, true);
         return;
     }
 

@@ -1,6 +1,7 @@
 <?php use App\Security\Csrf; ?>
 <section class="mx-auto max-w-6xl space-y-6">
 	<?php
+	$isPracticeMode = (bool) ($is_practice_mode ?? false);
 	$finiteSetStat = is_array($finite_set_stat ?? null) ? $finite_set_stat : null;
 	$formatSeconds = static function (?int $seconds): string {
 		if ($seconds === null || $seconds < 0) {
@@ -30,7 +31,7 @@
 	<div class="flex flex-col gap-2">
 		<a
 				class="mb-4 inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm"
-				href="/languages/<?= e((string)$set['language_id']) ?>">
+				href="<?= e($isPracticeMode ? '/practice/languages/' . (string) $set['language_id'] : '/languages/' . (string) $set['language_id']) ?>">
             <span aria-hidden="true">←</span>
             <span>Back</span>
         </a>
@@ -58,9 +59,8 @@
 				<div>
 					<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Whole set</p>
 					<h2 class="mt-2 text-xl font-semibold text-slate-950"><?= e($set['name']) ?></h2>
-					<p class="mt-2 text-sm text-slate-600">Study every card in this set with shuffled order and mixed
-						directions.</p>
-					<?php if ($finiteSetStat !== null): ?>
+					<p class="mt-2 text-sm text-slate-600"><?= e($isPracticeMode ? 'Practice every card in this set without the timer.' : 'Study every card in this set with shuffled order and mixed directions.') ?></p>
+					<?php if (!$isPracticeMode && $finiteSetStat !== null): ?>
 						<p class="mt-3 text-sm font-medium text-slate-700">
 							Fastest finite run:
 							<strong><?= e($formatSeconds((int) ($finiteSetStat['best_time_seconds'] ?? 0))) ?></strong>
@@ -69,17 +69,17 @@
 				</div>
 				<form
 						method="post"
-						action="/sets/<?= e((string)$set['id']) ?>/start">
+						action="<?= e($isPracticeMode ? '/practice/sets/' . (string) $set['id'] . '/start' : '/sets/' . (string) $set['id'] . '/start') ?>">
 					<?= Csrf::input() ?>
-					<button
-							class="btn-secondary w-full justify-center sm:w-auto"
-							type="submit">Study
-					</button>
+                    <button
+                            class="btn-secondary w-full justify-center sm:w-auto"
+                            type="submit"><?= e($isPracticeMode ? 'Practice' : 'Study') ?>
+                    </button>
 				</form>
 			</div>
 		</div>
 		
-		<?php if ($show_smart_sets): ?>
+		<?php if ($show_smart_sets && !$isPracticeMode): ?>
 			<div class="pt-4 sm:pt-6">
 				<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Smart Sets</p>
 				<h2 class="mt-2 text-2xl font-semibold text-slate-950">Focus this set where it matters most.</h2>
@@ -122,7 +122,7 @@
 					</div>
 				<?php endforeach; ?>
 			</div>
-		<?php else: ?>
+		<?php elseif (!$isPracticeMode): ?>
 			<div class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-5 text-sm leading-6 text-slate-700">
 				You can study this set as a guest right away. Create an account or log in to unlock smart sets based on
 				your progress and keep your history.

@@ -1,6 +1,7 @@
 <?php use App\Security\Csrf; ?>
 <section class="mx-auto max-w-6xl space-y-8">
 	<?php
+	$isPracticeMode = (bool) ($is_practice_mode ?? false);
 	$availableSmartSets = array_values(array_filter(
 		$smart_sets ?? [],
 		static fn(array $smartSet): bool => (int)($smartSet['count'] ?? 0) > 0
@@ -37,7 +38,7 @@
 	<div class="flex flex-col gap-2">
 		<a
 				class="mb-4 inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm"
-				href="/">
+				href="<?= e($isPracticeMode ? '/practice' : '/') ?>">
             <span aria-hidden="true">←</span>
             <span>Back</span>
         </a>
@@ -45,14 +46,14 @@
 			<div>
 				<h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl"><?= e($language['name']) ?></h1>
 				<p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-					<?= e($language['description'] !== '' ? $language['description'] : 'Choose a set to start studying.') ?>
+					<?= e($language['description'] !== '' ? $language['description'] : ($isPracticeMode ? 'Choose a set to start practicing.' : 'Choose a set to start studying.')) ?>
 				</p>
 			</div>
 		</div>
 	</div>
 
 	<div class="space-y-4">
-		<?php if ($show_smart_sets): ?>
+		<?php if ($show_smart_sets && !$isPracticeMode): ?>
 			<div class="flex items-end justify-between gap-4">
 				<div>
 					<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Smart Sets</p>
@@ -105,8 +106,9 @@
 			</div>
 		<?php else: ?>
 			<div class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-5 text-sm leading-6 text-slate-700">
-				You can study these sets as a guest right away. Create an account or log in to unlock smart sets based
-				on your progress and keep your history.
+				<?= e($isPracticeMode
+					? 'Smart sets are not available in practice mode'
+					: 'You can study these sets as a guest right away. Create an account or log in to unlock smart sets based on your progress and keep your history.') ?>
 			</div>
 		<?php endif; ?>
 
@@ -114,6 +116,7 @@
 			<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Sets</p>
 		</div>
 
+		<?php if (!$isPracticeMode): ?>
 		<div class="rounded-3xl border border-slate-300 bg-slate-100 px-5 py-6 shadow-sm sm:px-8">
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
@@ -134,6 +137,7 @@
 				</form>
 			</div>
 		</div>
+		<?php endif; ?>
 
 		<div class="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-4">
 			<?php foreach ($sets as $set): ?>
@@ -148,7 +152,7 @@
 								cards</p>
 							<a
 									class="btn-secondary justify-center"
-									href="/sets/<?= e((string)$set['id']) ?>">Study</a>
+									href="<?= e($isPracticeMode ? '/practice/sets/' . (string) $set['id'] : '/sets/' . (string) $set['id']) ?>"><?= e($isPracticeMode ? 'Practice' : 'Study') ?></a>
 						</div>
 					</div>
 				</div>

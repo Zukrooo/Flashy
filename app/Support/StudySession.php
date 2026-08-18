@@ -20,7 +20,8 @@ final class StudySession
         array $cards,
         string $mode = self::MODE_BILINGUAL,
         string $studyMode = self::STUDY_MODE_FINITE,
-        string $wrongMode = self::WRONG_MODE_STAY
+        string $wrongMode = self::WRONG_MODE_STAY,
+        bool $recordsProgress = true
     ): void
     {
         $normalizedCards = $this->normalizeCards($cards);
@@ -30,6 +31,7 @@ final class StudySession
             'mode' => $this->normalizeMode($mode),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode($wrongMode),
+            'records_progress' => $recordsProgress,
             'started_at' => time(),
             'score' => 0,
             'asked' => 0,
@@ -85,6 +87,17 @@ final class StudySession
         }
 
         return $this->normalizeWrongMode((string) ($session['wrong_mode'] ?? self::WRONG_MODE_STAY));
+    }
+
+    public function recordsProgress(string $sessionKey): bool
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        if (!is_array($session)) {
+            return true;
+        }
+
+        return (bool) ($session['records_progress'] ?? true);
     }
 
     public function setMode(string $sessionKey, string $mode): void
@@ -151,6 +164,7 @@ final class StudySession
             'mode' => $this->normalizeMode((string) ($session['mode'] ?? self::MODE_BILINGUAL)),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode((string) ($session['wrong_mode'] ?? self::WRONG_MODE_STAY)),
+            'records_progress' => (bool) ($session['records_progress'] ?? true),
             'started_at' => time(),
             'score' => 0,
             'asked' => 0,
@@ -173,6 +187,18 @@ final class StudySession
         }
 
         $session['wrong_mode'] = $this->normalizeWrongMode($wrongMode);
+        $_SESSION[self::KEY][$sessionKey] = $session;
+    }
+
+    public function setRecordsProgress(string $sessionKey, bool $recordsProgress): void
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        if (!is_array($session)) {
+            return;
+        }
+
+        $session['records_progress'] = $recordsProgress;
         $_SESSION[self::KEY][$sessionKey] = $session;
     }
 

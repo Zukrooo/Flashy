@@ -11,6 +11,12 @@ $modeOptions = [
 ];
 $showTranslationModes = $context['show_translation_modes'] ?? true;
 $headerPills = $context['pills'] ?? [$context['subtitle'], $context['name']];
+$settingsTitle = (string) ($context['settings_title'] ?? 'Study Settings');
+$showStudyModeSettings = (bool) ($context['show_study_mode'] ?? true);
+$isPractice = (bool) ($context['is_practice'] ?? false);
+$showPracticeProgressSetting = (bool) ($context['show_practice_progress_setting'] ?? false);
+$practiceRecordsProgress = (bool) ($context['practice_records_progress'] ?? false);
+$practiceProgressPath = (string) ($context['practice_progress_path'] ?? '');
 $currentStudyMode = $context['study_mode'] ?? 'infinite';
 $studyModeOptions = [
     'infinite' => 'Infinite',
@@ -303,15 +309,20 @@ $summaryLabel = $currentStudyMode === 'finite'
 	<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="order-2 space-y-2 lg:order-1 lg:sticky lg:top-8 lg:self-start lg:space-y-4">
             <div class="panel px-5 py-6 sm:px-8 sm:py-8">
-            <?php if ($isFiniteStudy): ?>
+            <?php if ($isFiniteStudy || $isPractice): ?>
                 <div class="mb-6 text-center">
-                    <p id="study-elapsed-timer" class="text-3xl font-semibold tabular-nums text-slate-950 sm:text-4xl"><?= e($formatSeconds($elapsedSeconds)) ?></p>
-                    <?php if ($bestFiniteTimeSeconds > 0): ?>
-                        <p class="mt-2 text-sm text-slate-600">Best <?= e($formatSeconds($bestFiniteTimeSeconds)) ?></p>
+                    <?php if ($isFiniteStudy): ?>
+                        <p id="study-elapsed-timer" class="text-3xl font-semibold tabular-nums text-slate-950 sm:text-4xl"><?= e($formatSeconds($elapsedSeconds)) ?></p>
+                        <?php if ($bestFiniteTimeSeconds > 0): ?>
+                            <p class="mt-2 text-sm text-slate-600">Best <?= e($formatSeconds($bestFiniteTimeSeconds)) ?></p>
+                        <?php endif; ?>
                     <?php endif; ?>
-                    <?php if (!empty($context['restart_path'])): ?>
+                    <?php if (!$isPractice && !empty($context['restart_path'])): ?>
                         <form method="post" action="<?= e($context['restart_path']) ?>" class="mt-2">
                             <?= Csrf::input() ?>
+                            <input type="hidden" name="mode" value="<?= e($currentMode) ?>">
+                            <input type="hidden" name="study_mode" value="<?= e($currentStudyMode) ?>">
+                            <input type="hidden" name="wrong_mode" value="<?= e($currentWrongMode) ?>">
                             <button
                                     type="submit"
                                     class="cursor-pointer text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-700 hover:decoration-slate-500">
@@ -422,7 +433,7 @@ $summaryLabel = $currentStudyMode === 'finite'
                         type="button"
                         id="study-settings-open"
                         class="flex w-full items-center justify-between border border-slate-800 bg-slate-800 px-4 py-3 text-left text-sm font-semibold uppercase tracking-[0.18em] text-slate-100 shadow-sm">
-                    <span>Study Settings</span>
+                    <span><?= e($settingsTitle) ?></span>
                     <span aria-hidden="true">⚙</span>
                 </button>
             </div>
@@ -457,6 +468,7 @@ $summaryLabel = $currentStudyMode === 'finite'
                 </div>
             <?php endif; ?>
 
+            <?php if ($showStudyModeSettings): ?>
             <div class="<?= $showTranslationModes ? 'mt-8 border-t border-slate-200 pt-8' : '' ?>">
                 <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Study Mode</h2>
 				<p class="mt-3 text-sm leading-6 text-slate-600">
@@ -485,6 +497,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 					<?php endforeach; ?>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="mt-8 border-t border-slate-200 pt-8">
                 <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Incorrect Answers</h2>
@@ -513,6 +526,30 @@ $summaryLabel = $currentStudyMode === 'finite'
                     <?php endforeach; ?>
                 </div>
             </div>
+
+            <?php if ($showPracticeProgressSetting && $practiceProgressPath !== ''): ?>
+                <div class="mt-8 border-t border-slate-200 pt-8">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Smart Sets</h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-600">
+                        Choose whether guesses made in practice should affect your smart sets. Off by default.
+                    </p>
+
+                    <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <?php foreach ([false => 'Off', true => 'On'] as $recordsProgressValue => $recordsProgressLabel): ?>
+                            <?php $isActive = $practiceRecordsProgress === (bool) $recordsProgressValue; ?>
+                            <form method="post" action="<?= e($practiceProgressPath) ?>">
+                                <?= Csrf::input() ?>
+                                <input type="hidden" name="records_progress" value="<?= $recordsProgressValue ? '1' : '0' ?>">
+                                <button
+                                        class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center"
+                                        type="submit">
+                                    <?= e($recordsProgressLabel) ?>
+                                </button>
+                            </form>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
 		</aside>
 	</div>
 </section>
@@ -525,7 +562,7 @@ $summaryLabel = $currentStudyMode === 'finite'
     <div class="panel w-full max-w-lg px-5 py-6 sm:px-8 sm:py-8">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Study settings</p>
+                <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700"><?= e($settingsTitle) ?></p>
                 <p class="mt-2 text-sm text-slate-600">Adjust translation and study behavior for this session.</p>
             </div>
             <button
@@ -566,6 +603,7 @@ $summaryLabel = $currentStudyMode === 'finite'
             </div>
         <?php endif; ?>
 
+        <?php if ($showStudyModeSettings): ?>
         <div class="<?= $showTranslationModes ? 'mt-8 border-t border-slate-200 pt-8' : 'mt-6 border-t border-slate-200 pt-6' ?>">
             <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Study Mode</h2>
             <p class="mt-3 text-sm leading-6 text-slate-600">
@@ -594,6 +632,7 @@ $summaryLabel = $currentStudyMode === 'finite'
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php endif; ?>
 
         <div class="mt-8 border-t border-slate-200 pt-8">
             <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Incorrect Answers</h2>
@@ -622,6 +661,30 @@ $summaryLabel = $currentStudyMode === 'finite'
                 <?php endforeach; ?>
             </div>
         </div>
+
+        <?php if ($showPracticeProgressSetting && $practiceProgressPath !== ''): ?>
+            <div class="mt-8 border-t border-slate-200 pt-8">
+                <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Smart Sets</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600">
+                    Choose whether guesses made in practice should affect your smart sets. Off by default.
+                </p>
+
+                <div class="mt-6 grid grid-cols-1 gap-3">
+                    <?php foreach ([false => 'Off', true => 'On'] as $recordsProgressValue => $recordsProgressLabel): ?>
+                        <?php $isActive = $practiceRecordsProgress === (bool) $recordsProgressValue; ?>
+                        <form method="post" action="<?= e($practiceProgressPath) ?>">
+                            <?= Csrf::input() ?>
+                            <input type="hidden" name="records_progress" value="<?= $recordsProgressValue ? '1' : '0' ?>">
+                            <button
+                                    class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center"
+                                    type="submit">
+                                <?= e($recordsProgressLabel) ?>
+                            </button>
+                        </form>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
