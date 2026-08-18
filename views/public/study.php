@@ -21,6 +21,12 @@ $wrongModeOptions = [
     'stay' => 'Stay Until Correct',
     'advance' => 'Move On',
 ];
+$summaryScore = (int) ($summary['score'] ?? 0);
+$summaryTotal = (int) ($summary['total'] ?? 0);
+$summaryCardTotal = (int) ($summary['card_total'] ?? 0);
+$summaryLabel = $currentStudyMode === 'finite'
+    ? sprintf('%d Correct / %d Cards (%d Guesses)', $summaryScore, $summaryCardTotal, $summaryTotal)
+    : sprintf('%d Correct in %d Guesses', $summaryScore, $summaryTotal);
 ?>
 <section class="mx-auto max-w-6xl pb-40">
 	<div class="mb-8 flex flex-col gap-1">
@@ -611,7 +617,7 @@ $wrongModeOptions = [
 			<p
 					class="text-sm text-slate-600"
 					data-study-summary>
-				<?= e((string)($summary['score'] ?? 0)) ?> correct / <?= e((string)($summary['total'] ?? 0)) ?> attempts
+				<?= e($summaryLabel) ?>
 			</p>
 		</div>
 		
@@ -670,6 +676,14 @@ $wrongModeOptions = [
 		const currentTranslationMode = form.dataset.translationMode ?? 'bilingual';
         const currentWrongMode = form.dataset.wrongMode ?? 'stay';
         let revealTimeoutId = null;
+
+        const formatSummaryLabel = (summary) => {
+            if (currentStudyMode === 'finite') {
+                return `${summary.score} Correct / ${summary.card_total} Cards (${summary.total} Guesses)`;
+            }
+
+            return `${summary.score} Correct in ${summary.total} Guesses`;
+        };
 
         const resetRevealState = () => {
             if (revealTimeoutId !== null) {
@@ -774,7 +788,7 @@ $wrongModeOptions = [
 		const updateSummary = (summary) => {
 			const summaryLine = document.querySelector('[data-study-summary]');
 			if (!summaryLine) return;
-			summaryLine.textContent = `${summary.score} correct / ${summary.total} attempts`;
+			summaryLine.textContent = formatSummaryLabel(summary);
 		};
 
 		const showCompletionModal = (summary, message) => {
@@ -786,10 +800,10 @@ $wrongModeOptions = [
 			if (modeInput) modeInput.value = currentTranslationMode;
 			if (studyModeInput) studyModeInput.value = currentStudyMode;
             const wrongModeInput = restartForm?.querySelector('input[name="wrong_mode"]');
-            if (wrongModeInput) wrongModeInput.value = currentWrongMode;
+			if (wrongModeInput) wrongModeInput.value = currentWrongMode;
 
 			completeMessage.textContent = message ?? '';
-			completeScore.textContent = `Score: ${summary.score} / ${summary.card_total} cards, ${summary.total} attempts`;
+			completeScore.textContent = formatSummaryLabel(summary);
 			completeModal.classList.remove('hidden');
 			completeModal.classList.add('flex');
 		};
