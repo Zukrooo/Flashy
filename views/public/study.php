@@ -73,7 +73,56 @@ $wrongModeOptions = [
 			grid-area: 1 / 1;
 			transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms ease, box-shadow 160ms ease, opacity 220ms ease;
 			will-change: transform, background-color, box-shadow, opacity;
+            position: relative;
+            min-height: 15.5rem;
+            perspective: 1600px;
+            overflow: hidden;
+            border-radius: 2rem;
 		}
+
+        .study-card-inner {
+            position: relative;
+            min-height: inherit;
+            transform-style: preserve-3d;
+            transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .study-card-face {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2rem;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        .study-card--theme-primary .study-card-face--prompt {
+            background: #020617;
+            color: #fff;
+            box-shadow: 0 24px 48px rgba(2, 6, 23, 0.15);
+        }
+
+        .study-card--theme-secondary .study-card-face--prompt {
+            background: #1e293b;
+            color: #fff;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+        }
+
+        .study-card-face--answer {
+            background: #9f1239;
+            color: #fff;
+            box-shadow: 0 24px 48px rgba(159, 18, 57, 0.28);
+            transform: rotateX(180deg);
+        }
+
+        .study-card.is-answer-revealed .study-card-inner {
+            transform: rotateX(180deg);
+        }
 
 		.study-card--back {
 			opacity: 0.92;
@@ -98,7 +147,11 @@ $wrongModeOptions = [
         }
 
 		.study-card.is-wrong {
-			animation: study-incorrect 760ms ease;
+			animation: study-incorrect-shake 760ms ease;
+		}
+
+        .study-card.is-wrong .study-card-face--prompt {
+            animation: study-incorrect-face 760ms ease;
 		}
 
 		.study-card.is-hidden {
@@ -130,43 +183,48 @@ $wrongModeOptions = [
 			}
 		}
 
-		@keyframes study-incorrect {
+		@keyframes study-incorrect-shake {
 			0% {
 				transform: translateX(0);
-				background: #020617;
-				box-shadow: 0 24px 48px rgba(2, 6, 23, 0.15);
 			}
 			12% {
 				transform: translateX(-14px);
-				background: #9f1239;
-				box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
 			}
 			24% {
 				transform: translateX(12px);
-				background: #9f1239;
-				box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
 			}
 			36% {
 				transform: translateX(-9px);
-				background: #9f1239;
-				box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
 			}
 			48% {
 				transform: translateX(7px);
-				background: #9f1239;
-				box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
 			}
 			60% {
 				transform: translateX(0);
-				background: #9f1239;
-				box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
 			}
 			100% {
 				transform: translateX(0);
-				background: #020617;
-				box-shadow: 0 24px 48px rgba(2, 6, 23, 0.15);
 			}
 		}
+
+        @keyframes study-incorrect-face {
+            0% {
+				background: #020617;
+				box-shadow: 0 24px 48px rgba(2, 6, 23, 0.15);
+            }
+            12%,
+            24%,
+            36%,
+            48%,
+            60% {
+                background: #9f1239;
+                box-shadow: 0 24px 48px rgba(159, 18, 57, 0.32);
+            }
+            100% {
+                background: #020617;
+                box-shadow: 0 24px 48px rgba(2, 6, 23, 0.15);
+            }
+        }
 
 		@keyframes study-skip-fly {
 			0% {
@@ -194,28 +252,48 @@ $wrongModeOptions = [
 			<div class="study-card-stack">
 				<div
 						id="study-card-back"
-						class="study-card study-card--back rounded-[2rem] bg-slate-800 px-6 py-10 text-center text-white shadow-xl shadow-slate-950/10 sm:px-8 sm:py-12">
-					<p
-							id="study-card-back-word"
-							class="study-card-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['prompt']) ?></p>
-					<p
-							id="study-card-back-language"
-							class="study-card-language-text mt-4 text-sm uppercase tracking-[0.24em] text-slate-300">
-						<?= e($card['prompt_language'] === 'English' ? 'English' : $context['subtitle']) ?>
-					</p>
+						class="study-card study-card--back study-card--theme-secondary">
+                    <div class="study-card-inner">
+                        <div class="study-card-face study-card-face--prompt">
+                            <p
+                                    class="study-card-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['prompt']) ?></p>
+                            <p
+                                    class="study-card-language-text mt-4 text-sm uppercase tracking-[0.24em] text-slate-300">
+                                <?= e($card['prompt_language'] === 'English' ? 'English' : $context['subtitle']) ?>
+                            </p>
+                        </div>
+                        <div class="study-card-face study-card-face--answer">
+                            <p
+                                    class="study-card-answer-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['expected']) ?></p>
+                            <p
+                                    class="study-card-answer-language-text mt-4 text-sm uppercase tracking-[0.24em] text-rose-100">
+                                <?= e($card['answer_language'] === 'English' ? 'English' : $context['subtitle']) ?>
+                            </p>
+                        </div>
+                    </div>
 				</div>
 
 				<div
 						id="study-card"
-						class="study-card study-card--front rounded-[2rem] bg-slate-950 px-6 py-10 text-center text-white shadow-2xl shadow-slate-950/15 sm:px-8 sm:py-12">
-					<p
-							id="study-card-word"
-							class="study-card-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['prompt']) ?></p>
-					<p
-							id="study-card-language"
-							class="study-card-language-text mt-4 text-sm uppercase tracking-[0.24em] text-slate-300">
-						<?= e($card['prompt_language'] === 'English' ? 'English' : $context['subtitle']) ?>
-					</p>
+						class="study-card study-card--front study-card--theme-primary">
+                    <div class="study-card-inner">
+                        <div class="study-card-face study-card-face--prompt">
+                            <p
+                                    class="study-card-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['prompt']) ?></p>
+                            <p
+                                    class="study-card-language-text mt-4 text-sm uppercase tracking-[0.24em] text-slate-300">
+                                <?= e($card['prompt_language'] === 'English' ? 'English' : $context['subtitle']) ?>
+                            </p>
+                        </div>
+                        <div class="study-card-face study-card-face--answer">
+                            <p
+                                    class="study-card-answer-word-text text-4xl font-bold sm:text-5xl lg:text-6xl"><?= e($card['expected']) ?></p>
+                            <p
+                                    class="study-card-answer-language-text mt-4 text-sm uppercase tracking-[0.24em] text-rose-100">
+                                <?= e($card['answer_language'] === 'English' ? 'English' : $context['subtitle']) ?>
+                            </p>
+                        </div>
+                    </div>
 				</div>
 			</div>
 
@@ -246,15 +324,20 @@ $wrongModeOptions = [
 				<p class="text-xs text-slate-500">
 					Answers are matched in lowercase.
 				</p>
-				<div class="grid grid-cols-2 gap-3 sm:flex">
+				<div class="grid grid-cols-3 gap-3 sm:flex">
 					<button
 							class="btn-primary w-full justify-center"
-							type="submit">Check answer
+							type="submit">Check
 					</button>
 					<button
 							id="skip-answer"
 							class="btn-secondary w-full justify-center"
 							type="button">Skip
+					</button>
+                    <button
+                            id="reveal-answer"
+                            class="w-full justify-center rounded-2xl bg-rose-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-900 cursor-pointer"
+                            type="button">Reveal
 					</button>
 				</div>
 			</form>
@@ -569,7 +652,9 @@ $wrongModeOptions = [
 		let frontCard = document.getElementById('study-card');
 		let backCard = document.getElementById('study-card-back');
 		const answerInput = document.getElementById('answer');
+        const checkButton = form.querySelector('button[type="submit"]');
 		const skipButton = document.getElementById('skip-answer');
+        const revealButton = document.getElementById('reveal-answer');
 		const history = document.getElementById('study-history');
 		const historyEmpty = document.getElementById('study-history-empty');
 		const completeModal = document.getElementById('study-complete-modal');
@@ -584,6 +669,45 @@ $wrongModeOptions = [
 		const currentStudyMode = form.dataset.studyMode ?? 'infinite';
 		const currentTranslationMode = form.dataset.translationMode ?? 'bilingual';
         const currentWrongMode = form.dataset.wrongMode ?? 'stay';
+        let revealTimeoutId = null;
+
+        const resetRevealState = () => {
+            if (revealTimeoutId !== null) {
+                window.clearTimeout(revealTimeoutId);
+                revealTimeoutId = null;
+            }
+            frontCard.classList.remove('is-answer-revealed');
+            answerInput.disabled = false;
+            if (checkButton) {
+                checkButton.disabled = false;
+            }
+            if (skipButton) {
+                skipButton.disabled = false;
+            }
+            if (revealButton) {
+                revealButton.disabled = false;
+            }
+        };
+
+        const revealCurrentAnswer = () => {
+            frontCard.classList.remove('is-correct', 'is-skipped', 'is-wrong', 'is-wrong-advance');
+            frontCard.classList.add('is-answer-revealed');
+            answerInput.disabled = true;
+            if (checkButton) {
+                checkButton.disabled = true;
+            }
+            if (skipButton) {
+                skipButton.disabled = true;
+            }
+            if (revealButton) {
+                revealButton.disabled = true;
+            }
+
+            revealTimeoutId = window.setTimeout(async () => {
+                revealTimeoutId = null;
+                await submitStudyAction('skip');
+            }, 2000);
+        };
 
         const setSettingsOpen = (open) => {
             if (!settingsModal) return;
@@ -625,16 +749,26 @@ $wrongModeOptions = [
 		};
 
 		const setCardContent = (cardEl, studyCard) => {
-			const languageEl = cardEl.querySelector('.study-card-language-text');
-			const wordEl = cardEl.querySelector('.study-card-word-text');
+			const promptLanguageEl = cardEl.querySelector('.study-card-language-text');
+			const promptWordEl = cardEl.querySelector('.study-card-word-text');
+            const answerLanguageEl = cardEl.querySelector('.study-card-answer-language-text');
+            const answerWordEl = cardEl.querySelector('.study-card-answer-word-text');
 
-			if (languageEl) {
-				languageEl.textContent = studyCard.prompt_language === 'English' ? 'English' : languageName;
+			if (promptLanguageEl) {
+				promptLanguageEl.textContent = studyCard.prompt_language === 'English' ? 'English' : languageName;
 			}
 
-			if (wordEl) {
-				wordEl.textContent = studyCard.prompt ?? '';
+			if (promptWordEl) {
+				promptWordEl.textContent = studyCard.prompt ?? '';
 			}
+
+            if (answerLanguageEl) {
+                answerLanguageEl.textContent = studyCard.answer_language === 'English' ? 'English' : languageName;
+            }
+
+            if (answerWordEl) {
+                answerWordEl.textContent = studyCard.expected ?? '';
+            }
 		};
 
 		const updateSummary = (summary) => {
@@ -726,10 +860,14 @@ $wrongModeOptions = [
 		}, true);
 
 		const submitStudyAction = async (mode) => {
+            if (revealTimeoutId !== null) {
+                window.clearTimeout(revealTimeoutId);
+                revealTimeoutId = null;
+            }
 			const formData = new FormData(form);
-			const submitButton = form.querySelector('button[type="submit"]');
-			if (submitButton) submitButton.disabled = true;
+			if (checkButton) checkButton.disabled = true;
 			if (skipButton) skipButton.disabled = true;
+            if (revealButton) revealButton.disabled = true;
 
 			try {
 				const response = await fetch(mode === 'skip' ? skipPath : form.action, {
@@ -766,6 +904,7 @@ $wrongModeOptions = [
 				updateSummary(payload.summary);
 				history.scrollTo({left: 0, behavior: 'smooth'});
 
+                resetRevealState();
 				frontCard.classList.remove('is-correct', 'is-skipped', 'is-wrong', 'is-wrong-advance', 'is-hidden');
 				backCard.classList.remove('is-revealed');
 				void frontCard.offsetWidth;
@@ -777,6 +916,7 @@ $wrongModeOptions = [
 
 					setTimeout(() => {
 						frontCard.classList.remove('is-wrong');
+                        resetRevealState();
 						answerInput.focus();
 					}, 760);
 
@@ -825,8 +965,9 @@ $wrongModeOptions = [
 			} catch (error) {
 				form.submit();
 			} finally {
-				if (submitButton) submitButton.disabled = false;
-				if (skipButton) skipButton.disabled = false;
+                if (!frontCard.classList.contains('is-answer-revealed') && checkButton) checkButton.disabled = false;
+				if (!frontCard.classList.contains('is-answer-revealed') && skipButton) skipButton.disabled = false;
+                if (!frontCard.classList.contains('is-answer-revealed') && revealButton) revealButton.disabled = false;
 			}
 		};
 
@@ -838,5 +979,9 @@ $wrongModeOptions = [
 		skipButton?.addEventListener('click', async () => {
 			await submitStudyAction('skip');
 		});
+
+        revealButton?.addEventListener('click', () => {
+            revealCurrentAnswer();
+        });
 	})();
 </script>
