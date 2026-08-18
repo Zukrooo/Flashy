@@ -31,32 +31,36 @@ final class PublicController
             $this->resetGuestStudyState();
         }
 
-        $languages = array_values(array_filter(
-            $this->languages->allWithCounts(true),
-            static fn (array $language): bool => (int) $language['set_count'] > 0
-        ));
+        $languages = $this->publishedLanguages();
+        $selectedLanguageId = $this->resolveSelectedLanguageId($languages);
+        $selectedLanguage = null;
 
-        View::render('public/home', [
+        foreach ($languages as $language) {
+            if ((int) $language['id'] === $selectedLanguageId) {
+                $selectedLanguage = $language;
+                break;
+            }
+        }
+
+        View::render('public/home', $this->withLanguageSwitcher([
             'title' => 'Learn Languages',
             'languages' => $languages,
             'is_logged_in' => $this->auth->checkUser(),
-            'is_practice_mode' => false,
-        ]);
+            'selected_language' => $selectedLanguage,
+            'study_path' => $selectedLanguageId !== null ? '/languages/' . $selectedLanguageId : null,
+            'practice_path' => $selectedLanguageId !== null ? '/practice/languages/' . $selectedLanguageId : null,
+        ], 'study', $selectedLanguageId));
     }
 
     public function practiceHome(): void
     {
-        $languages = array_values(array_filter(
-            $this->languages->allWithCounts(true),
-            static fn (array $language): bool => (int) $language['set_count'] > 0
-        ));
+        $selectedLanguageId = $this->resolveSelectedLanguageId($this->publishedLanguages());
 
-        View::render('public/home', [
-            'title' => 'Practice Languages',
-            'languages' => $languages,
-            'is_logged_in' => $this->auth->checkUser(),
-            'is_practice_mode' => true,
-        ]);
+        if ($selectedLanguageId === null) {
+            redirect('/');
+        }
+
+        redirect('/practice/languages/' . $selectedLanguageId);
     }
 
     public function language(int $languageId): void
@@ -72,6 +76,8 @@ final class PublicController
             View::render('errors/not-found', ['title' => 'Language not found']);
             return;
         }
+
+        $this->rememberSelectedLanguage((int) $language['id']);
 
         $sets = $this->sets->allPublishedForLanguage($languageId);
 
@@ -96,14 +102,14 @@ final class PublicController
             }
         }
 
-        View::render('public/language', [
+        View::render('public/language', $this->withLanguageSwitcher([
             'title' => $language['name'],
             'language' => $language,
             'sets' => $sets,
             'smart_sets' => $smartSets,
             'show_smart_sets' => $userId !== null,
             'is_practice_mode' => false,
-        ]);
+        ], 'study', (int) $language['id']));
     }
 
     public function practiceLanguage(int $languageId): void
@@ -115,6 +121,8 @@ final class PublicController
             View::render('errors/not-found', ['title' => 'Language not found']);
             return;
         }
+
+        $this->rememberSelectedLanguage((int) $language['id']);
 
         $sets = $this->sets->allPublishedForLanguage($languageId);
         $smartSets = [];
@@ -138,14 +146,14 @@ final class PublicController
             }
         }
 
-        View::render('public/language', [
+        View::render('public/language', $this->withLanguageSwitcher([
             'title' => 'Practice ' . $language['name'],
             'language' => $language,
             'sets' => $sets,
             'smart_sets' => $smartSets,
             'show_smart_sets' => $userId !== null,
             'is_practice_mode' => true,
-        ]);
+        ], 'practice', (int) $language['id']));
     }
 
     public function startSet(int $setId): void
@@ -289,6 +297,8 @@ final class PublicController
             redirect('/languages/' . $set['language_id']);
         }
 
+        $this->rememberSelectedLanguage((int) $set['language_id']);
+
         $smartSets = [];
         $userId = $this->auth->userId();
 
@@ -307,7 +317,7 @@ final class PublicController
 
         $finiteSetStat = $userId !== null ? $this->progress->finiteSetStat($userId, $setId) : null;
 
-        View::render('public/set', [
+        View::render('public/set', $this->withLanguageSwitcher([
             'title' => $set['name'],
             'set' => $set,
             'card_count' => count($cards),
@@ -315,7 +325,7 @@ final class PublicController
             'show_smart_sets' => $userId !== null,
             'finite_set_stat' => $finiteSetStat,
             'is_practice_mode' => false,
-        ]);
+        ], 'study', (int) $set['language_id']));
     }
 
     public function practiceSetLanding(int $setId): void
@@ -336,6 +346,8 @@ final class PublicController
             redirect('/practice/languages/' . $set['language_id']);
         }
 
+        $this->rememberSelectedLanguage((int) $set['language_id']);
+
         if ($userId !== null) {
             $counts = $this->progress->countsForSet($userId, $setId);
 
@@ -349,7 +361,7 @@ final class PublicController
             }
         }
 
-        View::render('public/set', [
+        View::render('public/set', $this->withLanguageSwitcher([
             'title' => 'Practice ' . $set['name'],
             'set' => $set,
             'card_count' => count($cards),
@@ -357,7 +369,7 @@ final class PublicController
             'show_smart_sets' => $userId !== null,
             'finite_set_stat' => null,
             'is_practice_mode' => true,
-        ]);
+        ], 'practice', (int) $set['language_id']));
     }
 
     public function startLanguageAll(int $languageId): void
@@ -386,6 +398,35 @@ final class PublicController
         );
         $this->rememberStudy('/study/language/' . $languageId . '/all');
         redirect('/study/language/' . $languageId . '/all');
+    }
+
+    public function startPracticeLanguageAll(int $languageId): void
+    {
+        $language = $this->languages->find($languageId);
+
+        if ($language === null) {
+            http_response_code(404);
+            View::render('errors/not-found', ['title' => 'Language not found']);
+            return;
+        }
+
+        $cards = $this->sets->cardsForPublishedLanguage($languageId);
+
+        if ($cards === []) {
+            Flash::put('error', 'This language has no published cards yet.');
+            redirect('/practice');
+        }
+
+        $this->studySession->start(
+            $this->practiceAllSessionKey($languageId),
+            $cards,
+            (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL),
+            StudySession::STUDY_MODE_INFINITE,
+            (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY),
+            false
+        );
+        $this->rememberStudy('/practice/language/' . $languageId . '/all');
+        redirect('/practice/language/' . $languageId . '/all');
     }
 
     public function startSmartSet(int $languageId, string $smartSet): void
@@ -465,9 +506,10 @@ final class PublicController
             redirect('/');
         }
 
+        $this->rememberSelectedLanguage((int) $set['language_id']);
         $this->rememberStudy('/study/set/' . $setId);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Study ' . $set['name'],
             'context' => [
                 'name' => $set['name'],
@@ -492,7 +534,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $set['language_id']));
     }
 
     public function practiceSet(int $setId): void
@@ -508,9 +550,10 @@ final class PublicController
             redirect('/sets/' . $setId);
         }
 
+        $this->rememberSelectedLanguage((int) $set['language_id']);
         $this->rememberStudy('/practice/set/' . $setId);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Practice ' . $set['name'],
             'context' => [
                 'name' => $set['name'],
@@ -534,7 +577,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'practice', (int) $set['language_id']));
     }
 
     public function practiceSmartSet(int $languageId, string $smartSet): void
@@ -554,9 +597,10 @@ final class PublicController
         }
 
         $path = '/practice/language/' . $languageId . '/smart/' . $smartSet;
+        $this->rememberSelectedLanguage((int) $language['id']);
         $this->rememberStudy($path);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Practice ' . $language['name'],
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -569,7 +613,6 @@ final class PublicController
                 'session_key' => $sessionKey,
                 'mode' => $this->studySession->mode($sessionKey),
                 'mode_path' => $path . '/mode',
-                'show_translation_modes' => false,
                 'show_study_mode' => false,
                 'settings_title' => 'Practice Settings',
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
@@ -581,7 +624,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'practice', (int) $language['id']));
     }
 
     public function practiceSetSmartSet(int $setId, string $smartSet): void
@@ -601,9 +644,10 @@ final class PublicController
         }
 
         $path = '/practice/set/' . $setId . '/smart/' . $smartSet;
+        $this->rememberSelectedLanguage((int) $set['language_id']);
         $this->rememberStudy($path);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Practice ' . $set['name'],
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -616,7 +660,6 @@ final class PublicController
                 'session_key' => $sessionKey,
                 'mode' => $this->studySession->mode($sessionKey),
                 'mode_path' => $path . '/mode',
-                'show_translation_modes' => false,
                 'show_study_mode' => false,
                 'settings_title' => 'Practice Settings',
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
@@ -628,7 +671,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'practice', (int) $set['language_id']));
     }
 
     public function studyLanguageAll(int $languageId): void
@@ -648,9 +691,10 @@ final class PublicController
             redirect('/');
         }
 
+        $this->rememberSelectedLanguage((int) $language['id']);
         $this->rememberStudy('/study/language/' . $languageId . '/all');
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Study ' . $language['name'],
             'context' => [
                 'name' => 'All',
@@ -673,7 +717,51 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $language['id']));
+    }
+
+    public function practiceLanguageAll(int $languageId): void
+    {
+        $language = $this->languages->find($languageId);
+        $cards = $this->sets->cardsForPublishedLanguage($languageId);
+        $sessionKey = $this->practiceAllSessionKey($languageId);
+        $this->studySession->syncCards($sessionKey, $cards);
+        $currentCard = $this->studySession->current($sessionKey);
+        $summary = $this->studySession->summary($sessionKey);
+
+        if ($language === null || $currentCard === null) {
+            redirect('/practice/languages/' . $languageId);
+        }
+
+        $this->rememberSelectedLanguage((int) $language['id']);
+        $this->rememberStudy('/practice/language/' . $languageId . '/all');
+
+        View::render('public/study', $this->withLanguageSwitcher([
+            'title' => 'Practice ' . $language['name'],
+            'context' => [
+                'name' => 'All',
+                'subtitle' => $language['name'],
+                'scope_label' => 'All published sets',
+                'pills' => [$language['name']],
+                'scope_detail' => 'Practicing every published set currently available in ' . $language['name'] . '.',
+                'back_path' => '/practice/languages/' . $languageId,
+                'answer_path' => '/practice/language/' . $languageId . '/all/answer',
+                'session_key' => $sessionKey,
+                'mode' => $this->studySession->mode($sessionKey),
+                'mode_path' => '/practice/language/' . $languageId . '/all/mode',
+                'show_study_mode' => false,
+                'settings_title' => 'Practice Settings',
+                'study_mode' => StudySession::STUDY_MODE_INFINITE,
+                'wrong_mode' => $this->studySession->wrongMode($sessionKey),
+                'wrong_mode_path' => '/practice/language/' . $languageId . '/all/wrong-mode',
+                'reset_path' => '/practice/language/' . $languageId . '/all/reset',
+                'restart_path' => '/practice/languages/' . $languageId . '/start-all',
+                'finish_path' => '/practice/languages/' . $languageId,
+                'is_practice' => true,
+            ],
+            'card' => $currentCard,
+            'summary' => $summary,
+        ], 'practice', (int) $language['id']));
     }
 
     public function studySmartSet(int $languageId, string $smartSet): void
@@ -697,9 +785,10 @@ final class PublicController
         }
 
         $path = '/study/language/' . $languageId . '/smart/' . $smartSet;
+        $this->rememberSelectedLanguage((int) $language['id']);
         $this->rememberStudy($path);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Study ' . $language['name'],
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -712,7 +801,6 @@ final class PublicController
                 'session_key' => $sessionKey,
                 'mode' => $this->studySession->mode($sessionKey),
                 'mode_path' => $path . '/mode',
-                'show_translation_modes' => false,
                 'study_mode' => $this->studySession->studyMode($sessionKey),
                 'study_mode_path' => $path . '/study-mode',
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
@@ -723,7 +811,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $language['id']));
     }
 
     public function studySetSmartSet(int $setId, string $smartSet): void
@@ -747,9 +835,10 @@ final class PublicController
         }
 
         $path = '/study/set/' . $setId . '/smart/' . $smartSet;
+        $this->rememberSelectedLanguage((int) $set['language_id']);
         $this->rememberStudy($path);
 
-        View::render('public/study', [
+        View::render('public/study', $this->withLanguageSwitcher([
             'title' => 'Study ' . $set['name'],
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -762,7 +851,6 @@ final class PublicController
                 'session_key' => $sessionKey,
                 'mode' => $this->studySession->mode($sessionKey),
                 'mode_path' => $path . '/mode',
-                'show_translation_modes' => false,
                 'study_mode' => $this->studySession->studyMode($sessionKey),
                 'study_mode_path' => $path . '/study-mode',
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
@@ -773,7 +861,7 @@ final class PublicController
             ],
             'card' => $currentCard,
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $set['language_id']));
     }
 
     public function answerSet(int $setId): void
@@ -809,6 +897,13 @@ final class PublicController
     {
         $this->studySession->syncCards($this->allSessionKey($languageId), $this->sets->cardsForPublishedLanguage($languageId));
         $this->handleAnswerResponse($this->allSessionKey($languageId), (string) ($_POST['answer'] ?? ''), '/study/language/' . $languageId . '/all');
+    }
+
+    public function answerPracticeLanguageAll(int $languageId): void
+    {
+        $sessionKey = $this->practiceAllSessionKey($languageId);
+        $this->studySession->syncCards($sessionKey, $this->sets->cardsForPublishedLanguage($languageId));
+        $this->handleAnswerResponse($sessionKey, (string) ($_POST['answer'] ?? ''), '/practice/language/' . $languageId . '/all');
     }
 
     public function answerSmartSet(int $languageId, string $smartSet): void
@@ -860,6 +955,13 @@ final class PublicController
     {
         $this->studySession->syncCards($this->allSessionKey($languageId), $this->sets->cardsForPublishedLanguage($languageId));
         $this->handleSkipResponse($this->allSessionKey($languageId), '/study/language/' . $languageId . '/all');
+    }
+
+    public function skipPracticeLanguageAll(int $languageId): void
+    {
+        $sessionKey = $this->practiceAllSessionKey($languageId);
+        $this->studySession->syncCards($sessionKey, $this->sets->cardsForPublishedLanguage($languageId));
+        $this->handleSkipResponse($sessionKey, '/practice/language/' . $languageId . '/all');
     }
 
     public function skipSmartSet(int $languageId, string $smartSet): void
@@ -918,6 +1020,26 @@ final class PublicController
         redirect('/practice/sets/' . $setId);
     }
 
+    public function switchLanguage(): void
+    {
+        $languageId = (int) ($_POST['language_id'] ?? 0);
+        $mode = (string) ($_POST['mode'] ?? 'study');
+        $languages = $this->publishedLanguages();
+        $selectedLanguageId = $this->resolveSelectedLanguageId($languages, $languageId);
+
+        if ($selectedLanguageId === null) {
+            redirect('/');
+        }
+
+        $this->rememberSelectedLanguage($selectedLanguageId);
+
+        if ($mode === 'practice') {
+            redirect('/practice/languages/' . $selectedLanguageId);
+        }
+
+        redirect('/languages/' . $selectedLanguageId);
+    }
+
     public function resetLanguageAll(int $languageId): void
     {
         $path = '/study/language/' . $languageId . '/all';
@@ -926,6 +1048,16 @@ final class PublicController
         unset($_SESSION['last_result'][$sessionKey]);
         $this->forgetStudy($path);
         redirect('/');
+    }
+
+    public function resetPracticeLanguageAll(int $languageId): void
+    {
+        $path = '/practice/language/' . $languageId . '/all';
+        $sessionKey = $this->practiceAllSessionKey($languageId);
+        $this->studySession->clear($sessionKey);
+        unset($_SESSION['last_result'][$sessionKey]);
+        $this->forgetStudy($path);
+        redirect('/practice/languages/' . $languageId);
     }
 
     public function completeSet(int $setId): void
@@ -940,7 +1072,8 @@ final class PublicController
 
         $summary = $this->attachFiniteSetTiming($sessionKey, $setId, $summary);
 
-        View::render('public/complete', [
+        $this->rememberSelectedLanguage((int) $set['language_id']);
+        View::render('public/complete', $this->withLanguageSwitcher([
             'title' => 'Study complete',
             'context' => [
                 'name' => $set['name'],
@@ -949,7 +1082,7 @@ final class PublicController
                 'restart_path' => '/sets/' . $setId . '/start',
             ],
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $set['language_id']));
     }
 
     public function completeLanguageAll(int $languageId): void
@@ -962,7 +1095,8 @@ final class PublicController
             redirect('/');
         }
 
-        View::render('public/complete', [
+        $this->rememberSelectedLanguage((int) $language['id']);
+        View::render('public/complete', $this->withLanguageSwitcher([
             'title' => 'Study complete',
             'context' => [
                 'name' => 'All',
@@ -971,7 +1105,7 @@ final class PublicController
                 'restart_path' => '/languages/' . $languageId . '/start-all',
             ],
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $language['id']));
     }
 
     public function completeSmartSet(int $languageId, string $smartSet): void
@@ -985,7 +1119,8 @@ final class PublicController
             redirect('/languages/' . $languageId);
         }
 
-        View::render('public/complete', [
+        $this->rememberSelectedLanguage((int) $language['id']);
+        View::render('public/complete', $this->withLanguageSwitcher([
             'title' => 'Study complete',
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -994,7 +1129,7 @@ final class PublicController
                 'restart_path' => '/languages/' . $languageId . '/smart/' . $smartSet . '/start',
             ],
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $language['id']));
     }
 
     public function completeSetSmartSet(int $setId, string $smartSet): void
@@ -1008,7 +1143,8 @@ final class PublicController
             redirect('/sets/' . $setId);
         }
 
-        View::render('public/complete', [
+        $this->rememberSelectedLanguage((int) $set['language_id']);
+        View::render('public/complete', $this->withLanguageSwitcher([
             'title' => 'Study complete',
             'context' => [
                 'name' => $this->smartSetDefinitions()[$smartSet]['name'],
@@ -1017,7 +1153,7 @@ final class PublicController
                 'restart_path' => '/sets/' . $setId . '/smart/' . $smartSet . '/start',
             ],
             'summary' => $summary,
-        ]);
+        ], 'study', (int) $set['language_id']));
     }
 
     public function resetSmartSet(int $languageId, string $smartSet): void
@@ -1055,14 +1191,14 @@ final class PublicController
     public function setModeForPracticeSmartSet(int $languageId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->lockMode($this->practiceSmartSessionKey($languageId, $smartSet), StudySession::MODE_BILINGUAL);
+        $this->studySession->setMode($this->practiceSmartSessionKey($languageId, $smartSet), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
         redirect('/practice/language/' . $languageId . '/smart/' . $smartSet);
     }
 
     public function setModeForPracticeSetSmartSet(int $setId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->lockMode($this->practiceSetSmartSessionKey($setId, $smartSet), StudySession::MODE_BILINGUAL);
+        $this->studySession->setMode($this->practiceSetSmartSessionKey($setId, $smartSet), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
         redirect('/practice/set/' . $setId . '/smart/' . $smartSet);
     }
 
@@ -1104,6 +1240,12 @@ final class PublicController
         redirect('/study/language/' . $languageId . '/all');
     }
 
+    public function setModeForPracticeLanguageAll(int $languageId): void
+    {
+        $this->studySession->setMode($this->practiceAllSessionKey($languageId), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
+        redirect('/practice/language/' . $languageId . '/all');
+    }
+
     public function setStudyModeForLanguageAll(int $languageId): void
     {
         $this->studySession->setStudyMode($this->allSessionKey($languageId), $this->sanitizeStudyMode((string) ($_POST['study_mode'] ?? StudySession::STUDY_MODE_INFINITE)));
@@ -1116,10 +1258,16 @@ final class PublicController
         redirect('/study/language/' . $languageId . '/all');
     }
 
+    public function setWrongModeForPracticeLanguageAll(int $languageId): void
+    {
+        $this->studySession->setWrongMode($this->practiceAllSessionKey($languageId), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/language/' . $languageId . '/all');
+    }
+
     public function setModeForSmartSet(int $languageId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->lockMode($this->smartSessionKey($languageId, $smartSet), StudySession::MODE_BILINGUAL);
+        $this->studySession->setMode($this->smartSessionKey($languageId, $smartSet), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
         redirect('/study/language/' . $languageId . '/smart/' . $smartSet);
     }
 
@@ -1140,7 +1288,7 @@ final class PublicController
     public function setModeForSetSmartSet(int $setId, string $smartSet): void
     {
         $this->auth->requireUser();
-        $this->studySession->lockMode($this->setSmartSessionKey($setId, $smartSet), StudySession::MODE_BILINGUAL);
+        $this->studySession->setMode($this->setSmartSessionKey($setId, $smartSet), (string) ($_POST['mode'] ?? StudySession::MODE_BILINGUAL));
         redirect('/study/set/' . $setId . '/smart/' . $smartSet);
     }
 
@@ -1274,6 +1422,49 @@ final class PublicController
         unset($_SESSION['study_sessions'], $_SESSION['last_result'], $_SESSION['last_study_path']);
     }
 
+    private function publishedLanguages(): array
+    {
+        return array_values(array_filter(
+            $this->languages->allWithCounts(true),
+            static fn (array $language): bool => (int) $language['set_count'] > 0
+        ));
+    }
+
+    private function withLanguageSwitcher(array $data, string $mode = 'study', ?int $currentLanguageId = null): array
+    {
+        $languages = $this->publishedLanguages();
+        $selectedLanguageId = $this->resolveSelectedLanguageId($languages, $currentLanguageId);
+        $data['language_switcher'] = [
+            'languages' => $languages,
+            'selected_language_id' => $selectedLanguageId,
+            'mode' => $mode,
+        ];
+
+        return $data;
+    }
+
+    private function resolveSelectedLanguageId(array $languages, ?int $preferredLanguageId = null): ?int
+    {
+        $availableIds = array_map(static fn (array $language): int => (int) $language['id'], $languages);
+
+        if ($preferredLanguageId !== null && in_array($preferredLanguageId, $availableIds, true)) {
+            return $preferredLanguageId;
+        }
+
+        $sessionLanguageId = (int) ($_SESSION['selected_language_id'] ?? 0);
+
+        if ($sessionLanguageId > 0 && in_array($sessionLanguageId, $availableIds, true)) {
+            return $sessionLanguageId;
+        }
+
+        return $availableIds[0] ?? null;
+    }
+
+    private function rememberSelectedLanguage(int $languageId): void
+    {
+        $_SESSION['selected_language_id'] = $languageId;
+    }
+
     private function wantsJson(): bool
     {
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
@@ -1313,6 +1504,11 @@ final class PublicController
     private function allSessionKey(int $languageId): string
     {
         return 'language-all-' . $languageId;
+    }
+
+    private function practiceAllSessionKey(int $languageId): string
+    {
+        return 'practice-language-all-' . $languageId;
     }
 
     private function smartSessionKey(int $languageId, string $smartSet): string

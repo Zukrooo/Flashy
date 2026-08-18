@@ -47,12 +47,6 @@ $summaryLabel = $currentStudyMode === 'finite'
 ?>
 <section class="mx-auto max-w-6xl pb-40">
 	<div class="mb-8 flex flex-col gap-1">
-		<a
-				class="mb-4 inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm"
-				href="<?= e($context['back_path'] ?? '/') ?>">
-            <span aria-hidden="true">←</span>
-            <span>Back</span>
-        </a>
         <div class="flex flex-col gap-4 sm:items-start sm:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500"><?= e($context['scope_label'] ?? 'Study set') ?></p>
@@ -496,7 +490,7 @@ $summaryLabel = $currentStudyMode === 'finite'
             </div>
             <?php endif; ?>
 
-            <div class="mt-8 border-t border-slate-200 pt-8">
+            <div class="<?= ($showTranslationModes || $showStudyModeSettings) ? 'mt-8 border-t border-slate-200 pt-8' : '' ?>">
                 <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Incorrect Answers</h2>
                 <p class="mt-3 text-sm leading-6 text-slate-600">
                     Choose whether a wrong answer must be corrected first or can move on to the next card.
@@ -608,7 +602,7 @@ $summaryLabel = $currentStudyMode === 'finite'
         </div>
         <?php endif; ?>
 
-        <div class="mt-8 border-t border-slate-200 pt-8">
+        <div class="<?= ($showTranslationModes || $showStudyModeSettings) ? 'mt-8 border-t border-slate-200 pt-8' : 'mt-6' ?>">
             <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Incorrect Answers</h2>
             <p class="mt-3 text-sm leading-6 text-slate-600">
                 Choose whether a wrong answer must be corrected first or can move on to the next card.

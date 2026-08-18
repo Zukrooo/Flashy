@@ -36,12 +36,6 @@
 		}
 	</style>
 	<div class="flex flex-col gap-2">
-		<a
-				class="mb-4 inline-flex w-fit items-center gap-2 rounded-2xl border border-slate-800 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-100 shadow-sm"
-				href="<?= e($isPracticeMode ? '/practice' : '/') ?>">
-            <span aria-hidden="true">←</span>
-            <span>Back</span>
-        </a>
 		<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 			<div>
 				<h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl"><?= e($language['name']) ?></h1>
@@ -117,7 +111,6 @@
 			<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Sets</p>
 		</div>
 
-		<?php if (!$isPracticeMode): ?>
 		<div class="rounded-3xl border border-slate-300 bg-slate-100 px-5 py-6 shadow-sm sm:px-8">
 			<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
@@ -129,16 +122,15 @@
 				</div>
 				<form
 						method="post"
-						action="/languages/<?= e((string)$language['id']) ?>/start-all">
+						action="<?= e($isPracticeMode ? '/practice/languages/' . (string) $language['id'] . '/start-all' : '/languages/' . (string) $language['id'] . '/start-all') ?>">
 					<?= Csrf::input() ?>
 					<button
 							class="btn-secondary justify-center sm:w-auto"
-							type="submit">Study
+							type="submit"><?= e($isPracticeMode ? 'Practice' : 'Study') ?>
 					</button>
 				</form>
 			</div>
 		</div>
-		<?php endif; ?>
 
 		<div class="grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-4">
 			<?php foreach ($sets as $set): ?>

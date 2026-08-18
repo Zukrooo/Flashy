@@ -4,12 +4,17 @@ use App\Security\Csrf;
 use App\Support\Flash;
 
 $flash = Flash::pull();
-$studyHref = isset($_SESSION['user_id']) ? ($_SESSION['last_study_path'] ?? '/') : '/';
 $userEmail = $_SESSION['user_email'] ?? null;
 $userFirstName = trim((string)($_SESSION['user_first_name'] ?? ''));
 $userLastName = trim((string)($_SESSION['user_last_name'] ?? ''));
 $userIsAdmin = (bool)($_SESSION['user_is_admin'] ?? false);
 $pageTitle = trim((string)($title ?? 'Flashy'));
+$languageSwitcher = is_array($language_switcher ?? null) ? $language_switcher : [];
+$switcherLanguages = is_array($languageSwitcher['languages'] ?? null) ? $languageSwitcher['languages'] : [];
+$selectedLanguageId = (int) ($languageSwitcher['selected_language_id'] ?? ($_SESSION['selected_language_id'] ?? 0));
+$switcherMode = (string) ($languageSwitcher['mode'] ?? 'study');
+$studyHref = $selectedLanguageId > 0 ? '/languages/' . $selectedLanguageId : '/';
+$practiceHref = $selectedLanguageId > 0 ? '/practice/languages/' . $selectedLanguageId : '/';
 
 if ($pageTitle === '') {
 	$pageTitle = 'Flashy';
@@ -61,6 +66,85 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 			display: inline-flex;
 			padding-bottom: 0.5rem;
 			margin-bottom: -0.5rem;
+			margin-left: 0.7rem;
+		}
+
+		.profile-greeting {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.45rem;
+			padding: 0.7rem 0;
+			font-size: 0.95rem;
+			font-weight: 600;
+			color: #0f172a;
+			cursor: pointer;
+		}
+
+		.profile-greeting-chevron {
+			font-size: 0.8rem;
+			color: #475569;
+		}
+
+		.language-switcher {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.75rem;
+		}
+
+		.language-switcher-label {
+			font-size: 0.9rem;
+			font-weight: 600;
+			color: #475569;
+		}
+
+		.language-switcher-field {
+			position: relative;
+			display: inline-flex;
+			align-items: center;
+		}
+
+		.language-switcher-select {
+			appearance: none;
+			-webkit-appearance: none;
+			-moz-appearance: none;
+			cursor: pointer;
+			border-radius: 1rem;
+			border: 0;
+			background: #fff;
+			padding: 0.625rem 2.2rem 0.625rem 1rem;
+			min-height: 2.5rem;
+			font-family: "Instrument Sans", "Segoe UI", sans-serif;
+			font-size: 0.875rem;
+			font-weight: 600;
+			letter-spacing: 0;
+			color: #334155;
+			line-height: 1.25rem;
+			box-shadow: 0 0 0 1px #e2e8f0;
+			outline: none;
+			transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+		}
+
+		.language-switcher-select:hover {
+			background: #f8fafc;
+		}
+
+		.language-switcher-select:focus {
+			background: #fff;
+			box-shadow: 0 0 0 1px #64748b, 0 0 0 3px rgba(148, 163, 184, 0.18);
+		}
+
+		.language-switcher-chevron {
+			position: absolute;
+			right: 0.8rem;
+			pointer-events: none;
+			color: #475569;
+		}
+
+		.nav-divider {
+			height: 2rem;
+			width: 1px;
+			background: rgba(148, 163, 184, 0.45);
+			margin: 0 0.15rem 0 0.35rem;
 		}
 
 		.profile-dropdown {
@@ -178,22 +262,64 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 				</div>
 			</div>
 			<nav class="hidden gap-3 sm:flex sm:items-center">
+				<?php if ($switcherLanguages !== []): ?>
+					<form
+							method="post"
+							action="/language-switch"
+							class="language-switcher">
+						<?= Csrf::input() ?>
+						<input
+								type="hidden"
+								name="mode"
+								value="<?= e($switcherMode) ?>">
+						<label
+								for="desktop-language-switcher"
+								class="language-switcher-label">Choose language:</label>
+						<div class="language-switcher-field">
+							<select
+									id="desktop-language-switcher"
+									name="language_id"
+									onchange="this.form.submit()"
+									class="language-switcher-select">
+								<?php foreach ($switcherLanguages as $languageOption): ?>
+									<option
+											value="<?= e((string) $languageOption['id']) ?>"
+										<?= (int) $languageOption['id'] === $selectedLanguageId ? ' selected' : '' ?>>
+										<?= e($languageOption['name']) ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<span
+									class="language-switcher-chevron"
+									aria-hidden="true">
+								<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path d="M3 5.25L7 9.25L11 5.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+								</svg>
+							</span>
+						</div>
+					</form>
+					<div
+							class="nav-divider"
+							aria-hidden="true"></div>
+				<?php endif; ?>
 				<a
 						class="btn-secondary w-full cursor-pointer sm:w-auto"
-						href="/">Language</a>
-				<a
-						class="btn-secondary w-full cursor-pointer sm:w-auto"
-						href="/practice">Practice</a>
+						href="<?= e($practiceHref) ?>">Practice</a>
 				<a
 						class="btn-secondary w-full cursor-pointer sm:w-auto"
 						href="<?= e($studyHref) ?>">Study</a>
 				<?php if ($userEmail !== null): ?>
 					<div class="profile-menu">
-						<button
-								class="btn-secondary w-full cursor-pointer sm:w-auto"
-								type="button">
+						<div class="profile-greeting">
 							<?= e($userFirstName !== '' ? 'Hi, ' . $userFirstName : (string)$userEmail) ?>
-						</button>
+							<span
+									class="profile-greeting-chevron"
+									aria-hidden="true">
+								<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<path d="M3 5.25L7 9.25L11 5.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+								</svg>
+							</span>
+						</div>
 						<div class="profile-dropdown profile-dropdown-card overflow-hidden rounded-2xl">
 							<div class="grid gap-1 p-2">
 								<?php if (isset($_SESSION['admin_user_id']) || $userIsAdmin): ?>
@@ -208,7 +334,12 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 										class="profile-dropdown-link"
 										href="/profile">
 									<span>Edit profile</span>
-									<span aria-hidden="true">›</span>
+									<span aria-hidden="true">
+										<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+											<path d="M9 9C10.7949 9 12.25 7.54493 12.25 5.75C12.25 3.95507 10.7949 2.5 9 2.5C7.20507 2.5 5.75 3.95507 5.75 5.75C5.75 7.54493 7.20507 9 9 9Z" stroke="currentColor" stroke-width="1.5"/>
+											<path d="M3.75 14.75C4.55 12.8306 6.51683 11.5 9 11.5C11.4832 11.5 13.45 12.8306 14.25 14.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+										</svg>
+									</span>
 								</a>
 								<form
 										method="post"
@@ -256,12 +387,46 @@ header('X-Robots-Tag: noindex, nofollow, noarchive', true);
 				</div>
 				<div class="flex flex-1 flex-col pt-8">
 					<div class="grid gap-3">
+						<?php if ($switcherLanguages !== []): ?>
+							<form
+									method="post"
+									action="/language-switch"
+									class="grid gap-2">
+								<?= Csrf::input() ?>
+								<input
+										type="hidden"
+										name="mode"
+										value="<?= e($switcherMode) ?>">
+								<label
+										for="mobile-language-switcher"
+										class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-600">Choose Language:</label>
+								<div class="language-switcher-field">
+									<select
+											id="mobile-language-switcher"
+											name="language_id"
+											onchange="this.form.submit()"
+											class="language-switcher-select w-full">
+										<?php foreach ($switcherLanguages as $languageOption): ?>
+											<option
+													value="<?= e((string) $languageOption['id']) ?>"
+												<?= (int) $languageOption['id'] === $selectedLanguageId ? ' selected' : '' ?>>
+												<?= e($languageOption['name']) ?>
+											</option>
+										<?php endforeach; ?>
+									</select>
+									<span
+											class="language-switcher-chevron"
+											aria-hidden="true">
+										<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+											<path d="M3 5.25L7 9.25L11 5.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+										</svg>
+									</span>
+								</div>
+							</form>
+						<?php endif; ?>
 						<a
 								class="btn-secondary w-full cursor-pointer justify-center"
-								href="/">Language</a>
-						<a
-								class="btn-secondary w-full cursor-pointer justify-center"
-								href="/practice">Practice</a>
+								href="<?= e($practiceHref) ?>">Practice</a>
 						<a
 								class="btn-secondary w-full cursor-pointer justify-center"
 								href="<?= e($studyHref) ?>">Study</a>

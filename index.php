@@ -123,6 +123,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && $path === '/language-switch') {
+        $dispatch(static fn () => $publicController->switchLanguage(), false, true);
+        return;
+    }
+
     if ($method === 'GET' && $path === '/profile') {
         $dispatch(static fn () => $publicAuthController->showProfile());
         return;
@@ -183,6 +188,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/languages/(\d+)/start-all$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->startPracticeLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/languages/(\d+)/smart/([a-z-]+)/start$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->startSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
@@ -215,6 +225,11 @@ try {
 
     if ($method === 'GET' && preg_match('#^/study/language/(\d+)/all$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->studyLanguageAll((int) $matches[1]));
+        return;
+    }
+
+    if ($method === 'GET' && preg_match('#^/practice/language/(\d+)/all$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->practiceLanguageAll((int) $matches[1]));
         return;
     }
 
@@ -318,6 +333,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/answer$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->answerPracticeLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/smart/([a-z-]+)/answer$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->answerSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
@@ -330,6 +350,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/all/skip$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->skipLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/skip$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->skipPracticeLanguageAll((int) $matches[1]), false, true);
         return;
     }
 
@@ -348,6 +373,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/mode$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setModeForPracticeLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/all/study-mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setStudyModeForLanguageAll((int) $matches[1]), false, true);
         return;
@@ -355,6 +385,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/all/wrong-mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setWrongModeForLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/wrong-mode$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setWrongModeForPracticeLanguageAll((int) $matches[1]), false, true);
         return;
     }
 
@@ -425,6 +460,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/all/reset$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->resetLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/reset$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->resetPracticeLanguageAll((int) $matches[1]), false, true);
         return;
     }
 
