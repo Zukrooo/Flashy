@@ -1,4 +1,23 @@
 <?php use App\Security\Csrf; ?>
+<?php
+$formatSeconds = static function (?int $seconds): string {
+    if ($seconds === null || $seconds < 0) {
+        return '0:00';
+    }
+
+    $hours = intdiv($seconds, 3600);
+    $minutes = intdiv($seconds % 3600, 60);
+    $remainingSeconds = $seconds % 60;
+
+    if ($hours > 0) {
+        return sprintf('%d:%02d:%02d', $hours, $minutes, $remainingSeconds);
+    }
+
+    return sprintf('%d:%02d', $minutes, $remainingSeconds);
+};
+$isFiniteStudy = ($summary['study_mode'] ?? 'infinite') === 'finite';
+$bestTimeSeconds = isset($summary['best_time_seconds']) ? (int) $summary['best_time_seconds'] : null;
+?>
 <section class="mx-auto max-w-4xl">
     <div class="panel px-5 py-6 sm:px-8 sm:py-8">
         <p class="text-sm font-semibold uppercase tracking-[0.24em] text-accent">Session complete</p>
@@ -7,6 +26,19 @@
         <p class="mt-4 text-base text-slate-600">
             Score: <strong><?= e((string) $summary['score']) ?></strong> / <strong><?= e((string) $summary['total']) ?></strong>
         </p>
+        <?php if ($isFiniteStudy): ?>
+            <p class="mt-2 text-base text-slate-600">
+                Time: <strong><?= e($formatSeconds((int) ($summary['elapsed_seconds'] ?? 0))) ?></strong>
+            </p>
+            <?php if ($bestTimeSeconds !== null): ?>
+                <p class="mt-2 text-sm text-slate-600">
+                    Fastest finite run: <strong><?= e($formatSeconds($bestTimeSeconds)) ?></strong>
+                    <?php if (!empty($summary['is_new_best_time'])): ?>
+                        <span class="font-semibold text-emerald-700">New personal best.</span>
+                    <?php endif; ?>
+                </p>
+            <?php endif; ?>
+        <?php endif; ?>
 
         <div class="mt-8 space-y-3">
             <?php foreach ($summary['results'] as $result): ?>

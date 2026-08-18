@@ -142,6 +142,72 @@ final class UserProgressRepository
 
         $deleteProgress = $this->pdo->prepare('DELETE FROM user_card_progress WHERE user_id = :user_id');
         $deleteProgress->execute(['user_id' => $userId]);
+
+        $deleteSetStats = $this->pdo->prepare('DELETE FROM user_set_finite_stats WHERE user_id = :user_id');
+        $deleteSetStats->execute(['user_id' => $userId]);
+    }
+
+    public function finiteSetStat(int $userId, int $setId): ?array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT * FROM user_set_finite_stats WHERE user_id = :user_id AND set_id = :set_id LIMIT 1'
+        );
+        $statement->execute([
+            'user_id' => $userId,
+            'set_id' => $setId,
+        ]);
+        $stat = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($stat) ? $stat : null;
+    }
+
+    public function recordFiniteSetCompletion(int $userId, int $setId, int $elapsedSeconds): array
+    {
+        $existing = $this->finiteSetStat($userId, $setId);
+        $now = date('c');
+
+        if ($existing === null) {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO user_set_finite_stats
+                 (user_id, set_id, best_time_seconds, completed_runs, last_completed_at, created_at, updated_at)
+                 VALUES
+                 (:user_id, :set_id, :best_time_seconds, :completed_runs, :last_completed_at, :created_at, :updated_at)'
+            );
+            $statement->execute([
+                'user_id' => $userId,
+                'set_id' => $setId,
+                'best_time_seconds' => $elapsedSeconds,
+                'completed_runs' => 1,
+                'last_completed_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return $this->finiteSetStat($userId, $setId) ?? [
+                'best_time_seconds' => $elapsedSeconds,
+                'completed_runs' => 1,
+                'last_completed_at' => $now,
+            ];
+        }
+
+        $statement = $this->pdo->prepare(
+            'UPDATE user_set_finite_stats
+             SET best_time_seconds = :best_time_seconds,
+                 completed_runs = :completed_runs,
+                 last_completed_at = :last_completed_at,
+                 updated_at = :updated_at
+             WHERE user_id = :user_id AND set_id = :set_id'
+        );
+        $statement->execute([
+            'user_id' => $userId,
+            'set_id' => $setId,
+            'best_time_seconds' => min($elapsedSeconds, (int) $existing['best_time_seconds']),
+            'completed_runs' => (int) $existing['completed_runs'] + 1,
+            'last_completed_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return $this->finiteSetStat($userId, $setId) ?? $existing;
     }
 
     private function classifyCard(array $card): string

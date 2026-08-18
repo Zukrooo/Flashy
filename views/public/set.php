@@ -1,6 +1,22 @@
 <?php use App\Security\Csrf; ?>
 <section class="mx-auto max-w-6xl space-y-6">
 	<?php
+	$finiteSetStat = is_array($finite_set_stat ?? null) ? $finite_set_stat : null;
+	$formatSeconds = static function (?int $seconds): string {
+		if ($seconds === null || $seconds < 0) {
+			return '0:00';
+		}
+
+		$hours = intdiv($seconds, 3600);
+		$minutes = intdiv($seconds % 3600, 60);
+		$remainingSeconds = $seconds % 60;
+
+		if ($hours > 0) {
+			return sprintf('%d:%02d:%02d', $hours, $minutes, $remainingSeconds);
+		}
+
+		return sprintf('%d:%02d', $minutes, $remainingSeconds);
+	};
 	$availableSmartSets = array_values(array_filter(
 		$smart_sets ?? [],
 		static fn(array $smartSet): bool => (int)($smartSet['count'] ?? 0) > 0
@@ -44,6 +60,12 @@
 					<h2 class="mt-2 text-xl font-semibold text-slate-950"><?= e($set['name']) ?></h2>
 					<p class="mt-2 text-sm text-slate-600">Study every card in this set with shuffled order and mixed
 						directions.</p>
+					<?php if ($finiteSetStat !== null): ?>
+						<p class="mt-3 text-sm font-medium text-slate-700">
+							Fastest finite run:
+							<strong><?= e($formatSeconds((int) ($finiteSetStat['best_time_seconds'] ?? 0))) ?></strong>
+						</p>
+					<?php endif; ?>
 				</div>
 				<form
 						method="post"

@@ -30,12 +30,14 @@ final class StudySession
             'mode' => $this->normalizeMode($mode),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode($wrongMode),
+            'started_at' => time(),
             'score' => 0,
             'asked' => 0,
             'card_total' => count($normalizedCards),
             'results' => [],
             'current_card' => null,
             'complete' => false,
+            'completion_recorded' => false,
         ];
 
         $this->advance($sessionKey);
@@ -149,12 +151,14 @@ final class StudySession
             'mode' => $this->normalizeMode((string) ($session['mode'] ?? self::MODE_BILINGUAL)),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode((string) ($session['wrong_mode'] ?? self::WRONG_MODE_STAY)),
+            'started_at' => time(),
             'score' => 0,
             'asked' => 0,
             'card_total' => count($normalizedCards),
             'results' => [],
             'current_card' => null,
             'complete' => false,
+            'completion_recorded' => false,
         ];
 
         $this->advance($sessionKey);
@@ -308,6 +312,8 @@ final class StudySession
             'total' => (int) $session['asked'],
             'score' => (int) $session['score'],
             'card_total' => (int) ($session['card_total'] ?? count($session['cards'] ?? [])),
+            'study_mode' => $this->normalizeStudyMode((string) ($session['study_mode'] ?? self::STUDY_MODE_INFINITE)),
+            'elapsed_seconds' => $this->elapsedSeconds($session),
             'results' => array_reverse($session['results']),
             'complete' => (bool) ($session['complete'] ?? false)
                 || (
@@ -316,6 +322,25 @@ final class StudySession
                     && (int) ($session['asked'] ?? 0) >= (int) ($session['card_total'] ?? 0)
                 ),
         ];
+    }
+
+    public function completionRecorded(string $sessionKey): bool
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        return is_array($session) && (bool) ($session['completion_recorded'] ?? false);
+    }
+
+    public function markCompletionRecorded(string $sessionKey): void
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        if (!is_array($session)) {
+            return;
+        }
+
+        $session['completion_recorded'] = true;
+        $_SESSION[self::KEY][$sessionKey] = $session;
     }
 
     public function clear(string $sessionKey): void
@@ -439,6 +464,13 @@ final class StudySession
         }
 
         return null;
+    }
+
+    private function elapsedSeconds(array $session): int
+    {
+        $startedAt = (int) ($session['started_at'] ?? time());
+
+        return max(0, time() - $startedAt);
     }
 
     private function buildCurrentCard(array $sourceCard, bool $askForEnglish): array

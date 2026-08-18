@@ -154,12 +154,15 @@ final class PublicController
             }
         }
 
+        $finiteSetStat = $userId !== null ? $this->progress->finiteSetStat($userId, $setId) : null;
+
         View::render('public/set', [
             'title' => $set['name'],
             'set' => $set,
             'card_count' => count($cards),
             'smart_sets' => $smartSets,
             'show_smart_sets' => $userId !== null,
+            'finite_set_stat' => $finiteSetStat,
         ]);
     }
 
@@ -289,6 +292,9 @@ final class PublicController
                 'reset_path' => '/study/set/' . $setId . '/reset',
                 'restart_path' => '/sets/' . $setId . '/start',
                 'finish_path' => '/sets/' . $setId,
+                'best_finite_time_seconds' => ($this->auth->userId() !== null
+                    ? (int) (($this->progress->finiteSetStat($this->auth->userId(), $setId)['best_time_seconds'] ?? 0))
+                    : 0),
             ],
             'card' => $currentCard,
             'summary' => $summary,
@@ -443,7 +449,7 @@ final class PublicController
     public function answerSet(int $setId): void
     {
         $this->studySession->syncCards($this->setSessionKey($setId), $this->cards->forSet($setId));
-        $this->handleAnswerResponse($this->setSessionKey($setId), (string) ($_POST['answer'] ?? ''), '/study/set/' . $setId);
+        $this->handleAnswerResponse($this->setSessionKey($setId), (string) ($_POST['answer'] ?? ''), '/study/set/' . $setId, $setId);
     }
 
     public function answerLanguageAll(int $languageId): void
@@ -471,7 +477,7 @@ final class PublicController
     public function skipSet(int $setId): void
     {
         $this->studySession->syncCards($this->setSessionKey($setId), $this->cards->forSet($setId));
-        $this->handleSkipResponse($this->setSessionKey($setId), '/study/set/' . $setId);
+        $this->handleSkipResponse($this->setSessionKey($setId), '/study/set/' . $setId, $setId);
     }
 
     public function skipLanguageAll(int $languageId): void
@@ -525,6 +531,8 @@ final class PublicController
         if ($set === null || $summary === null) {
             redirect('/');
         }
+
+        $summary = $this->attachFiniteSetTiming($sessionKey, $setId, $summary);
 
         View::render('public/complete', [
             'title' => 'Study complete',
@@ -704,7 +712,7 @@ final class PublicController
         redirect('/study/set/' . $setId . '/smart/' . $smartSet);
     }
 
-    private function handleAnswerResponse(string $sessionKey, string $answer, string $redirectPath): void
+    private function handleAnswerResponse(string $sessionKey, string $answer, string $redirectPath, ?int $setId = null): void
     {
         $result = $this->studySession->answer($sessionKey, $answer);
 
@@ -718,6 +726,9 @@ final class PublicController
         $this->recordProgress($result);
         $currentCard = $this->studySession->current($sessionKey);
         $summary = $this->studySession->summary($sessionKey);
+        $summary = $summary !== null && $setId !== null
+            ? $this->attachFiniteSetTiming($sessionKey, $setId, $summary)
+            : $summary;
 
         if ($this->wantsJson()) {
             $this->json([
@@ -738,7 +749,7 @@ final class PublicController
         redirect($redirectPath);
     }
 
-    private function handleSkipResponse(string $sessionKey, string $redirectPath): void
+    private function handleSkipResponse(string $sessionKey, string $redirectPath, ?int $setId = null): void
     {
         $result = $this->studySession->skip($sessionKey);
 
@@ -752,6 +763,9 @@ final class PublicController
         $this->recordProgress($result);
         $currentCard = $this->studySession->current($sessionKey);
         $summary = $this->studySession->summary($sessionKey);
+        $summary = $summary !== null && $setId !== null
+            ? $this->attachFiniteSetTiming($sessionKey, $setId, $summary)
+            : $summary;
 
         if ($this->wantsJson()) {
             $this->json([
@@ -859,6 +873,37 @@ final class PublicController
             $ratio >= 0.35 => 'Useful session. This set needs another round soon.',
             default => 'Tough round. Run it again while the misses are still fresh.',
         };
+    }
+
+    private function attachFiniteSetTiming(string $sessionKey, int $setId, array $summary): array
+    {
+        $userId = $this->auth->userId();
+        $summary['best_time_seconds'] = null;
+        $summary['is_new_best_time'] = false;
+
+        if ($userId === null) {
+            return $summary;
+        }
+
+        if (($summary['study_mode'] ?? StudySession::STUDY_MODE_INFINITE) !== StudySession::STUDY_MODE_FINITE) {
+            return $summary;
+        }
+
+        $existingStat = $this->progress->finiteSetStat($userId, $setId);
+        $previousBest = $existingStat !== null ? (int) $existingStat['best_time_seconds'] : null;
+
+        if (($summary['complete'] ?? false) === true && !$this->studySession->completionRecorded($sessionKey)) {
+            $elapsedSeconds = (int) ($summary['elapsed_seconds'] ?? 0);
+            $existingStat = $this->progress->recordFiniteSetCompletion($userId, $setId, $elapsedSeconds);
+            $summary['is_new_best_time'] = $previousBest === null || $elapsedSeconds < $previousBest;
+            $this->studySession->markCompletionRecorded($sessionKey);
+        }
+
+        $summary['best_time_seconds'] = $existingStat !== null
+            ? (int) ($existingStat['best_time_seconds'] ?? 0)
+            : $previousBest;
+
+        return $summary;
     }
 
     private function smartSetDefinitions(): array

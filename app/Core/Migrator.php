@@ -96,6 +96,22 @@ final class Migrator
             )'
         );
 
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS user_set_finite_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                set_id INTEGER NOT NULL,
+                best_time_seconds INTEGER NOT NULL,
+                completed_runs INTEGER NOT NULL DEFAULT 0,
+                last_completed_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, set_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (set_id) REFERENCES sets(id) ON DELETE CASCADE
+            )'
+        );
+
         if (!self::sqliteColumnExists($pdo, 'sets', 'language_id')) {
             $pdo->exec('ALTER TABLE sets ADD COLUMN language_id INTEGER');
         }
@@ -221,6 +237,23 @@ final class Migrator
                 KEY user_card_attempts_card_id_index (card_id),
                 CONSTRAINT user_card_attempts_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT user_card_attempts_card_fk FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS user_set_finite_stats (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT UNSIGNED NOT NULL,
+                set_id BIGINT UNSIGNED NOT NULL,
+                best_time_seconds INT NOT NULL,
+                completed_runs INT NOT NULL DEFAULT 0,
+                last_completed_at VARCHAR(50) NOT NULL,
+                created_at VARCHAR(50) NOT NULL,
+                updated_at VARCHAR(50) NOT NULL,
+                UNIQUE KEY user_set_finite_stats_user_set_unique (user_id, set_id),
+                KEY user_set_finite_stats_set_id_index (set_id),
+                CONSTRAINT user_set_finite_stats_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                CONSTRAINT user_set_finite_stats_set_fk FOREIGN KEY (set_id) REFERENCES sets(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
 

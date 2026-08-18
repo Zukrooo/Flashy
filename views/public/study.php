@@ -21,6 +21,20 @@ $wrongModeOptions = [
     'stay' => 'Stay Until Correct',
     'advance' => 'Move On',
 ];
+$formatSeconds = static function (?int $seconds): string {
+    if ($seconds === null || $seconds < 0) {
+        return '00:00:00';
+    }
+
+    $hours = intdiv($seconds, 3600);
+    $minutes = intdiv($seconds % 3600, 60);
+    $remainingSeconds = $seconds % 60;
+
+    return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
+};
+$isFiniteStudy = $currentStudyMode === 'finite';
+$elapsedSeconds = (int) ($summary['elapsed_seconds'] ?? 0);
+$bestFiniteTimeSeconds = (int) ($context['best_finite_time_seconds'] ?? 0);
 $summaryScore = (int) ($summary['score'] ?? 0);
 $summaryTotal = (int) ($summary['total'] ?? 0);
 $summaryCardTotal = (int) ($summary['card_total'] ?? 0);
@@ -289,6 +303,24 @@ $summaryLabel = $currentStudyMode === 'finite'
 	<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="order-2 space-y-2 lg:order-1 lg:sticky lg:top-8 lg:self-start lg:space-y-4">
             <div class="panel px-5 py-6 sm:px-8 sm:py-8">
+            <?php if ($isFiniteStudy): ?>
+                <div class="mb-6 text-center">
+                    <p id="study-elapsed-timer" class="text-3xl font-semibold tabular-nums text-slate-950 sm:text-4xl"><?= e($formatSeconds($elapsedSeconds)) ?></p>
+                    <?php if ($bestFiniteTimeSeconds > 0): ?>
+                        <p class="mt-2 text-sm text-slate-600">Best <?= e($formatSeconds($bestFiniteTimeSeconds)) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($context['restart_path'])): ?>
+                        <form method="post" action="<?= e($context['restart_path']) ?>" class="mt-2">
+                            <?= Csrf::input() ?>
+                            <button
+                                    type="submit"
+                                    class="cursor-pointer text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-slate-700 hover:decoration-slate-500">
+                                Restart session
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 			<div class="study-card-stack">
 				<div
 						id="study-card-back"
@@ -605,6 +637,9 @@ $summaryLabel = $currentStudyMode === 'finite'
 		<p
 				id="study-complete-score"
 				class="mt-4 text-base text-slate-600"></p>
+        <p
+                id="study-complete-time"
+                class="mt-2 text-sm text-slate-600"></p>
 
 		<div class="mt-8 grid gap-3 sm:flex sm:flex-wrap">
 			<form
@@ -700,24 +735,28 @@ $summaryLabel = $currentStudyMode === 'finite'
         const revealButton = document.getElementById('reveal-answer');
 		const history = document.getElementById('study-history');
 		const historyEmpty = document.getElementById('study-history-empty');
+        const elapsedTimer = document.getElementById('study-elapsed-timer');
 		const completeModal = document.getElementById('study-complete-modal');
         const settingsModal = document.getElementById('study-settings-modal');
         const settingsOpenButton = document.getElementById('study-settings-open');
         const settingsCloseButton = document.getElementById('study-settings-close');
 		const completeMessage = document.getElementById('study-complete-message');
 		const completeScore = document.getElementById('study-complete-score');
+        const completeTime = document.getElementById('study-complete-time');
 		const restartForm = document.getElementById('study-complete-restart');
 		const languageName = form.dataset.languageName;
 		const skipPath = form.dataset.skipPath;
 		const currentStudyMode = form.dataset.studyMode ?? 'infinite';
 		const currentTranslationMode = form.dataset.translationMode ?? 'bilingual';
         const currentWrongMode = form.dataset.wrongMode ?? 'stay';
+        let elapsedSeconds = Number(<?= json_encode($elapsedSeconds, JSON_THROW_ON_ERROR) ?>);
         const actionButtons = {
             answer: checkButton,
             skip: skipButton,
             reveal: revealButton,
         };
         let revealTimeoutId = null;
+        let elapsedIntervalId = null;
 
         const formatSummaryLabel = (summary) => {
             if (currentStudyMode === 'finite') {
@@ -725,6 +764,44 @@ $summaryLabel = $currentStudyMode === 'finite'
             }
 
             return `${summary.score} Correct in ${summary.total} Guesses`;
+        };
+
+        const formatElapsed = (seconds) => {
+            const safeSeconds = Math.max(0, Number(seconds) || 0);
+            const hours = Math.floor(safeSeconds / 3600);
+            const minutes = Math.floor((safeSeconds % 3600) / 60);
+            const remainingSeconds = safeSeconds % 60;
+
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+        };
+
+        const renderElapsedTimer = () => {
+            if (!elapsedTimer || currentStudyMode !== 'finite') {
+                return;
+            }
+
+            elapsedTimer.textContent = formatElapsed(elapsedSeconds);
+        };
+
+        const syncElapsedTimer = (summary) => {
+            if (currentStudyMode !== 'finite') {
+                return;
+            }
+
+            elapsedSeconds = Number(summary.elapsed_seconds ?? elapsedSeconds);
+            renderElapsedTimer();
+        };
+
+        const startElapsedTimer = () => {
+            if (currentStudyMode !== 'finite' || !elapsedTimer) {
+                return;
+            }
+
+            renderElapsedTimer();
+            elapsedIntervalId = window.setInterval(() => {
+                elapsedSeconds += 1;
+                renderElapsedTimer();
+            }, 1000);
         };
 
         const setActionLoading = (mode, loading) => {
@@ -838,7 +915,12 @@ $summaryLabel = $currentStudyMode === 'finite'
 		};
 
 		const showCompletionModal = (summary, message) => {
-			if (!completeModal || !completeMessage || !completeScore) return;
+			if (!completeModal || !completeMessage || !completeScore || !completeTime) return;
+
+            if (elapsedIntervalId !== null) {
+                window.clearInterval(elapsedIntervalId);
+                elapsedIntervalId = null;
+            }
 
 			const modeInput = restartForm?.querySelector('input[name="mode"]');
 			const studyModeInput = restartForm?.querySelector('input[name="study_mode"]');
@@ -850,6 +932,9 @@ $summaryLabel = $currentStudyMode === 'finite'
 
 			completeMessage.textContent = message ?? '';
 			completeScore.textContent = formatSummaryLabel(summary);
+            completeTime.textContent = currentStudyMode === 'finite'
+                ? `Time: ${formatElapsed(summary.elapsed_seconds ?? 0)}${summary.best_time_seconds ? ` • Best: ${formatElapsed(summary.best_time_seconds)}` : ''}${summary.is_new_best_time ? ' • New personal best' : ''}`
+                : '';
 			completeModal.classList.remove('hidden');
 			completeModal.classList.add('flex');
 		};
@@ -970,6 +1055,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 
 				if (historyEmpty) historyEmpty.remove();
 				history.insertAdjacentHTML('afterbegin', renderHistoryItem(payload.result));
+                syncElapsedTimer(payload.summary);
 				updateSummary(payload.summary);
 				history.scrollTo({left: 0, behavior: 'smooth'});
 
@@ -1047,5 +1133,13 @@ $summaryLabel = $currentStudyMode === 'finite'
         revealButton?.addEventListener('click', () => {
             revealCurrentAnswer();
         });
+
+        window.requestAnimationFrame(() => {
+            if (!answerInput.disabled) {
+                answerInput.focus();
+            }
+        });
+
+        startElapsedTimer();
 	})();
 </script>
