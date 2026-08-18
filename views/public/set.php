@@ -79,7 +79,7 @@
 			</div>
 		</div>
 		
-		<?php if ($show_smart_sets && !$isPracticeMode): ?>
+		<?php if ($show_smart_sets): ?>
 			<div class="pt-4 sm:pt-6">
 				<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Smart Sets</p>
 				<h2 class="mt-2 text-2xl font-semibold text-slate-950">Focus this set where it matters most.</h2>

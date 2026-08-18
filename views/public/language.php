@@ -53,7 +53,7 @@
 	</div>
 
 	<div class="space-y-4">
-		<?php if ($show_smart_sets && !$isPracticeMode): ?>
+		<?php if ($show_smart_sets): ?>
 			<div class="flex items-end justify-between gap-4">
 				<div>
 					<p class="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Smart Sets</p>
