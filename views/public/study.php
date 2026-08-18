@@ -924,6 +924,14 @@ $summaryLabel = $currentStudyMode === 'finite'
 			const formData = new FormData(form);
             answerInput.disabled = true;
             setActionLoading(mode, true);
+            let payloadIsComplete = false;
+            const focusAnswerInput = () => {
+                if (payloadIsComplete) {
+                    return;
+                }
+
+                answerInput.focus();
+            };
 
 			try {
 				const response = await fetch(mode === 'skip' ? skipPath : form.action, {
@@ -955,14 +963,16 @@ $summaryLabel = $currentStudyMode === 'finite'
 					return;
 				}
 
+                payloadIsComplete = Boolean(payload.summary.complete);
+                frontCard.classList.remove('is-answer-revealed');
                 clearActionState();
+                focusAnswerInput();
 
 				if (historyEmpty) historyEmpty.remove();
 				history.insertAdjacentHTML('afterbegin', renderHistoryItem(payload.result));
 				updateSummary(payload.summary);
 				history.scrollTo({left: 0, behavior: 'smooth'});
 
-                frontCard.classList.remove('is-answer-revealed');
 				frontCard.classList.remove('is-correct', 'is-skipped', 'is-wrong', 'is-wrong-advance', 'is-hidden');
 				backCard.classList.remove('is-revealed');
 				void frontCard.offsetWidth;
@@ -974,7 +984,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 
 					setTimeout(() => {
 						frontCard.classList.remove('is-wrong');
-						answerInput.focus();
+						focusAnswerInput();
 					}, 760);
 
 					return;
@@ -1018,7 +1028,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 					backCard = outgoingCard;
 
                     frontCard.classList.remove('is-answer-revealed');
-					answerInput.focus();
+					focusAnswerInput();
 				}, 520);
 			} catch (error) {
 				form.submit();
