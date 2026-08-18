@@ -1,0 +1,7 @@
+/node_modules/
+/public/assets/app.css
+/public/assets/app.css.map
+/config/database.php
+/data/*.sqlite
+/data/*.sqlite-shm
+/data/*.sqlite-wal
