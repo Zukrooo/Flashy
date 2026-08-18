@@ -70,6 +70,40 @@ $summaryLabel = $currentStudyMode === 'finite'
             display: flex;
         }
 
+        .study-action-button {
+            position: relative;
+        }
+
+        .study-action-button.is-loading {
+            color: transparent;
+        }
+
+        .study-action-button.is-loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1rem;
+            height: 1rem;
+            margin-top: -0.5rem;
+            margin-left: -0.5rem;
+            border: 2px solid #fff;
+            border-right-color: transparent;
+            border-radius: 9999px;
+            animation: study-button-spin 0.7s linear infinite;
+        }
+
+        .study-action-button.btn-secondary.is-loading::after {
+            border-color: #0f172a;
+            border-right-color: transparent;
+        }
+
+        @keyframes study-button-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
 		.study-card-stack {
 			display: grid;
 			overflow: visible;
@@ -332,17 +366,20 @@ $summaryLabel = $currentStudyMode === 'finite'
 				</p>
 				<div class="grid grid-cols-3 gap-3 sm:flex">
 					<button
-							class="btn-primary w-full justify-center"
+							data-study-action-button="answer"
+                            class="study-action-button btn-primary w-full justify-center"
 							type="submit">Check
 					</button>
 					<button
 							id="skip-answer"
-							class="btn-secondary w-full justify-center"
+							data-study-action-button="skip"
+							class="study-action-button btn-secondary w-full justify-center"
 							type="button">Skip
 					</button>
                     <button
                             id="reveal-answer"
-                            class="w-full justify-center rounded-2xl bg-rose-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-900 cursor-pointer"
+                            data-study-action-button="reveal"
+                            class="study-action-button w-full justify-center rounded-2xl bg-rose-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-900 cursor-pointer"
                             type="button">Reveal
 					</button>
 				</div>
@@ -675,6 +712,11 @@ $summaryLabel = $currentStudyMode === 'finite'
 		const currentStudyMode = form.dataset.studyMode ?? 'infinite';
 		const currentTranslationMode = form.dataset.translationMode ?? 'bilingual';
         const currentWrongMode = form.dataset.wrongMode ?? 'stay';
+        const actionButtons = {
+            answer: checkButton,
+            skip: skipButton,
+            reveal: revealButton,
+        };
         let revealTimeoutId = null;
 
         const formatSummaryLabel = (summary) => {
@@ -685,37 +727,41 @@ $summaryLabel = $currentStudyMode === 'finite'
             return `${summary.score} Correct in ${summary.total} Guesses`;
         };
 
-        const resetRevealState = () => {
+        const setActionLoading = (mode, loading) => {
+            Object.entries(actionButtons).forEach(([actionMode, button]) => {
+                if (!button) {
+                    return;
+                }
+
+                button.disabled = loading || frontCard.classList.contains('is-answer-revealed');
+                button.classList.toggle('is-loading', loading && actionMode === mode);
+                button.setAttribute('aria-busy', loading && actionMode === mode ? 'true' : 'false');
+            });
+        };
+
+        const clearRevealTimer = () => {
             if (revealTimeoutId !== null) {
                 window.clearTimeout(revealTimeoutId);
                 revealTimeoutId = null;
             }
-            frontCard.classList.remove('is-answer-revealed');
+        };
+
+        const clearActionState = () => {
+            clearRevealTimer();
             answerInput.disabled = false;
-            if (checkButton) {
-                checkButton.disabled = false;
-            }
-            if (skipButton) {
-                skipButton.disabled = false;
-            }
-            if (revealButton) {
-                revealButton.disabled = false;
-            }
+            setActionLoading('answer', false);
+        };
+
+        const resetRevealState = () => {
+            frontCard.classList.remove('is-answer-revealed');
+            clearActionState();
         };
 
         const revealCurrentAnswer = () => {
             frontCard.classList.remove('is-correct', 'is-skipped', 'is-wrong', 'is-wrong-advance');
             frontCard.classList.add('is-answer-revealed');
             answerInput.disabled = true;
-            if (checkButton) {
-                checkButton.disabled = true;
-            }
-            if (skipButton) {
-                skipButton.disabled = true;
-            }
-            if (revealButton) {
-                revealButton.disabled = true;
-            }
+            setActionLoading('reveal', true);
 
             revealTimeoutId = window.setTimeout(async () => {
                 revealTimeoutId = null;
@@ -874,14 +920,10 @@ $summaryLabel = $currentStudyMode === 'finite'
 		}, true);
 
 		const submitStudyAction = async (mode) => {
-            if (revealTimeoutId !== null) {
-                window.clearTimeout(revealTimeoutId);
-                revealTimeoutId = null;
-            }
+            clearRevealTimer();
 			const formData = new FormData(form);
-			if (checkButton) checkButton.disabled = true;
-			if (skipButton) skipButton.disabled = true;
-            if (revealButton) revealButton.disabled = true;
+            answerInput.disabled = true;
+            setActionLoading(mode, true);
 
 			try {
 				const response = await fetch(mode === 'skip' ? skipPath : form.action, {
@@ -913,12 +955,14 @@ $summaryLabel = $currentStudyMode === 'finite'
 					return;
 				}
 
+                clearActionState();
+
 				if (historyEmpty) historyEmpty.remove();
 				history.insertAdjacentHTML('afterbegin', renderHistoryItem(payload.result));
 				updateSummary(payload.summary);
 				history.scrollTo({left: 0, behavior: 'smooth'});
 
-                resetRevealState();
+                frontCard.classList.remove('is-answer-revealed');
 				frontCard.classList.remove('is-correct', 'is-skipped', 'is-wrong', 'is-wrong-advance', 'is-hidden');
 				backCard.classList.remove('is-revealed');
 				void frontCard.offsetWidth;
@@ -930,7 +974,6 @@ $summaryLabel = $currentStudyMode === 'finite'
 
 					setTimeout(() => {
 						frontCard.classList.remove('is-wrong');
-                        resetRevealState();
 						answerInput.focus();
 					}, 760);
 
@@ -974,14 +1017,11 @@ $summaryLabel = $currentStudyMode === 'finite'
 					frontCard = incomingCard;
 					backCard = outgoingCard;
 
+                    frontCard.classList.remove('is-answer-revealed');
 					answerInput.focus();
 				}, 520);
 			} catch (error) {
 				form.submit();
-			} finally {
-                if (!frontCard.classList.contains('is-answer-revealed') && checkButton) checkButton.disabled = false;
-				if (!frontCard.classList.contains('is-answer-revealed') && skipButton) skipButton.disabled = false;
-                if (!frontCard.classList.contains('is-answer-revealed') && revealButton) revealButton.disabled = false;
 			}
 		};
 
