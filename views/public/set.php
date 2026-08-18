@@ -42,7 +42,7 @@
                     <?= e($set['language_name']) ?>
                 </span>
 					<span class="inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
-                    <?= e((string)$card_count) ?> cards
+                    <?= e((string)$card_count) ?> words
                 </span>
 				</div>
 				<h1 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl"><?= e($set['name']) ?></h1>
@@ -102,7 +102,7 @@
 											study more cards to use this smart set.</p>
 									<?php else: ?>
 										<p class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"><?= e((string)$smartSet['count']) ?>
-											cards</p>
+											words</p>
 									<?php endif; ?>
 								</div>
 								<?php if (!$isEmpty): ?>

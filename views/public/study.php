@@ -45,7 +45,7 @@ $summaryScore = (int) ($summary['score'] ?? 0);
 $summaryTotal = (int) ($summary['total'] ?? 0);
 $summaryCardTotal = (int) ($summary['card_total'] ?? 0);
 $summaryLabel = $currentStudyMode === 'finite'
-    ? sprintf('%d Correct / %d Cards (%d Guesses)', $summaryScore, $summaryCardTotal, $summaryTotal)
+    ? sprintf('%d Correct / %d Words (%d Guesses)', $summaryScore, $summaryCardTotal, $summaryTotal)
     : sprintf('%d Correct in %d Guesses', $summaryScore, $summaryTotal);
 ?>
 <section class="mx-auto max-w-6xl pb-40">
@@ -823,7 +823,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 
         const formatSummaryLabel = (summary) => {
             if (currentStudyMode === 'finite') {
-                return `${summary.score} Correct / ${summary.card_total} Cards (${summary.total} Guesses)`;
+                return `${summary.score} Correct / ${summary.card_total} Words (${summary.total} Guesses)`;
             }
 
             return `${summary.score} Correct in ${summary.total} Guesses`;

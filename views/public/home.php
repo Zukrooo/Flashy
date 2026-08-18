@@ -33,7 +33,7 @@
 						</p>
 						<p class="mt-5 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
 							<?= e((string)$language['set_count']) ?> sets · <?= e((string)$language['card_count']) ?>
-							cards
+							words
 						</p>
 					</div>
 					<a

@@ -84,7 +84,7 @@
 											study more cards to use this smart set.</p>
 									<?php else: ?>
 										<p class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400"><?= e((string)$smartSet['count']) ?>
-											cards</p>
+											words</p>
 									<?php endif; ?>
 								</div>
 								<?php if (!$isEmpty): ?>
@@ -123,7 +123,7 @@
 					<h2 class="text-xl font-semibold text-slate-950">All</h2>
 					<p class="mt-2 text-sm text-slate-600">Random cards from every published set in this language.</p>
                     <p class="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
-                        <?= e((string) ($language['card_count'] ?? 0)) ?> cards
+                        <?= e((string) ($language['card_count'] ?? 0)) ?> words
                     </p>
 				</div>
 				<form
@@ -149,7 +149,7 @@
 						</div>
 						<div class="mt-auto flex items-end justify-between gap-3">
 							<p class="text-xs font-medium uppercase tracking-[0.2em] text-slate-500"><?= e((string)$set['card_count']) ?>
-								cards</p>
+								words</p>
 							<a
 									class="btn-secondary justify-center"
 									href="<?= e($isPracticeMode ? '/practice/sets/' . (string) $set['id'] : '/sets/' . (string) $set['id']) ?>"><?= e($isPracticeMode ? 'Practice' : 'Study') ?></a>
