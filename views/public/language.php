@@ -1,7 +1,7 @@
 <?php use App\Security\Csrf; ?>
 <section class="mx-auto max-w-6xl space-y-8">
 	<?php
-	$isPracticeMode = (bool) ($is_practice_mode ?? false);
+	$isPracticeMode = (bool)($is_practice_mode ?? false);
 	$availableSmartSets = array_values(array_filter(
 		$smart_sets ?? [],
 		static fn(array $smartSet): bool => (int)($smartSet['count'] ?? 0) > 0
@@ -96,8 +96,8 @@
 									<form
 											method="post"
 											action="<?= e($isPracticeMode
-												? '/practice/languages/' . (string) $language['id'] . '/smart/' . $smartSet['key'] . '/start'
-												: '/languages/' . (string) $language['id'] . '/smart/' . $smartSet['key'] . '/start') ?>">
+												? '/practice/languages/' . (string)$language['id'] . '/smart/' . $smartSet['key'] . '/start'
+												: '/languages/' . (string)$language['id'] . '/smart/' . $smartSet['key'] . '/start') ?>">
 										<?= Csrf::input() ?>
 										<button
 												class="btn-secondary justify-center sm:w-auto"
@@ -127,13 +127,13 @@
 				<div>
 					<h2 class="text-xl font-semibold text-slate-950">All</h2>
 					<p class="mt-2 text-sm text-slate-600">Random cards from every published set in this language.</p>
-                    <p class="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
-                        <?= e((string) ($language['card_count'] ?? 0)) ?> words
-                    </p>
+					<p class="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+						<?= e((string)($language['card_count'] ?? 0)) ?> words
+					</p>
 				</div>
 				<form
 						method="post"
-						action="<?= e($isPracticeMode ? '/practice/languages/' . (string) $language['id'] . '/start-all' : '/languages/' . (string) $language['id'] . '/start-all') ?>">
+						action="<?= e($isPracticeMode ? '/practice/languages/' . (string)$language['id'] . '/start-all' : '/languages/' . (string)$language['id'] . '/start-all') ?>">
 					<?= Csrf::input() ?>
 					<button
 							class="btn-secondary justify-center sm:w-auto"
@@ -156,7 +156,7 @@
 								words</p>
 							<a
 									class="btn-secondary justify-center"
-									href="<?= e($isPracticeMode ? '/practice/sets/' . (string) $set['id'] : '/sets/' . (string) $set['id']) ?>"><?= e($isPracticeMode ? 'Practice' : 'Study') ?></a>
+									href="<?= e($isPracticeMode ? '/practice/sets/' . (string)$set['id'] : '/sets/' . (string)$set['id']) ?>"><?= e($isPracticeMode ? 'Practice' : 'Study') ?></a>
 						</div>
 					</div>
 				</div>
