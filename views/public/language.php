@@ -35,12 +35,23 @@
 			display: flex;
 		}
 	</style>
+
 	<div class="flex flex-col gap-2">
 		<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 			<div>
 				<h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl"><?= e($language['name']) ?></h1>
-				<p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-					<?= e($language['description'] !== '' ? $language['description'] : ($isPracticeMode ? 'Choose a set to start practicing.' : 'Choose a set to start studying.')) ?>
+				<?php if ($language['description'] !== ''): ?>
+					<p class="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+						<?= e($language['description']) ?>
+					</p>
+				<?php endif; ?>
+				<h2 class="mt-3 text-2xl font-semibold text-slate-800">
+					<?= e($isPracticeMode ? 'Practice' : 'Study') ?>
+				</h2>
+				<p class="mt-3 max-w-2xl text-base leading-7 text-slate-600">
+					<?= e($isPracticeMode
+						? 'Practice is untimed and does not record your results. Choose typing or multiple choice, then repeat cards for as long as you like.'
+						: 'Study tracks your progress when you are signed in. Choose a timed finite session or keep cycling through cards, with smart sets adapting to your answer history.') ?>
 				</p>
 			</div>
 		</div>
