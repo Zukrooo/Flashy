@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i ./resources/css/app.css -o ./public/assets/app.css --minify",
-    "dev:css": "tailwindcss -i ./resources/css/app.css -o ./public/assets/app.css --watch"
+    "build:css": "node ./node_modules/@tailwindcss/cli/dist/index.mjs -i ./resources/css/app.css -o ./public/assets/app.css --minify",
+    "dev:css": "node ./node_modules/@tailwindcss/cli/dist/index.mjs -i ./resources/css/app.css -o ./public/assets/app.css --watch"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.12",
