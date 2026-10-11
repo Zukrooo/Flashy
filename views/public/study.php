@@ -14,6 +14,11 @@ $headerPills = $context['pills'] ?? [$context['subtitle'], $context['name']];
 $settingsTitle = (string) ($context['settings_title'] ?? 'Study Settings');
 $showStudyModeSettings = (bool) ($context['show_study_mode'] ?? true);
 $isPractice = (bool) ($context['is_practice'] ?? false);
+$currentAnswerStyle = $context['answer_style'] ?? 'typing';
+$answerStyleOptions = [
+    'typing' => 'Typing',
+    'choices' => 'Multiple Choice',
+];
 $currentStudyMode = $context['study_mode'] ?? 'infinite';
 $studyModeOptions = [
     'infinite' => 'Infinite',
@@ -107,6 +112,45 @@ $summaryLabel = $currentStudyMode === 'finite'
         .study-action-button.btn-secondary.is-loading::after {
             border-color: #0f172a;
             border-right-color: transparent;
+        }
+
+        .study-answer-choices {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .study-answer-choice {
+            width: min(100%, 15rem);
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            background: #f1f5f9;
+            padding: 0.75rem 1rem;
+            color: #1e293b;
+            font-size: 0.925rem;
+            font-weight: 600;
+            line-height: 1.4;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+        }
+
+        .study-answer-choice:hover {
+            border-color: #94a3b8;
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        .study-answer-choice:focus-visible {
+            outline: 3px solid rgba(100, 116, 139, 0.3);
+            outline-offset: 2px;
+        }
+
+        .study-answer-choice:disabled {
+            cursor: wait;
+            opacity: 0.6;
+            transform: none;
         }
 
         @keyframes study-button-spin {
@@ -383,25 +427,35 @@ $summaryLabel = $currentStudyMode === 'finite'
                     data-finish-path="<?= e($context['finish_path'] ?? ($context['back_path'] ?? '/')) ?>"
                     data-study-mode="<?= e($currentStudyMode) ?>"
                     data-translation-mode="<?= e($currentMode) ?>"
+                    data-answer-style="<?= e($currentAnswerStyle) ?>"
                     data-wrong-mode="<?= e($currentWrongMode) ?>">
 				<?= Csrf::input() ?>
-				<div class="field">
+				<div class="field <?= $currentAnswerStyle === 'choices' ? 'hidden' : '' ?>">
 					<input
 							id="answer"
 							name="answer"
 							type="text"
-							required
+							<?= $currentAnswerStyle === 'typing' ? 'required' : '' ?>
 							autocomplete="off"
-							autofocus
+							<?= $currentAnswerStyle === 'typing' ? 'autofocus' : '' ?>
 							placeholder="Your answer...">
 				</div>
-				<p class="text-xs text-slate-500">
+				<?php if ($currentAnswerStyle === 'choices'): ?>
+					<div id="answer-choices" class="study-answer-choices">
+						<?php foreach (($card['choices'] ?? []) as $choice): ?>
+							<button type="submit" name="answer" value="<?= e($choice) ?>" data-answer-choice="<?= e($choice) ?>" class="study-answer-choice">
+								<?= e($choice) ?>
+							</button>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+				<p class="text-xs text-slate-500 <?= $currentAnswerStyle === 'choices' ? 'hidden' : '' ?>">
 					Answers are matched in lowercase.
 				</p>
-				<div class="grid grid-cols-3 gap-3 sm:flex">
+				<div class="grid <?= $currentAnswerStyle === 'choices' ? 'mt-16 grid-cols-2' : 'grid-cols-3' ?> gap-3 sm:flex">
 					<button
 							data-study-action-button="answer"
-                            class="study-action-button btn-primary w-full justify-center"
+                            class="study-action-button btn-primary w-full justify-center <?= $currentAnswerStyle === 'choices' ? 'hidden' : '' ?>"
 							type="submit">Check
 					</button>
 					<button
@@ -486,6 +540,28 @@ $summaryLabel = $currentStudyMode === 'finite'
 							</button>
 						</form>
 					<?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($isPractice): ?>
+            <div class="mt-8 border-t border-slate-200 pt-8">
+                <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Answer Style</h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600">
+                    Type each translation or select it from a list of possible answers.
+                </p>
+
+                <div class="mt-6 grid grid-cols-1 gap-3">
+                    <?php foreach ($answerStyleOptions as $answerStyleValue => $answerStyleLabel): ?>
+                        <?php $isActive = $currentAnswerStyle === $answerStyleValue; ?>
+                        <form method="post" action="<?= e($context['answer_style_path']) ?>">
+                            <?= Csrf::input() ?>
+                            <input type="hidden" name="answer_style" value="<?= e($answerStyleValue) ?>">
+                            <button class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center" type="submit">
+                                <?= e($answerStyleLabel) ?>
+                            </button>
+                        </form>
+                    <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -595,6 +671,28 @@ $summaryLabel = $currentStudyMode === 'finite'
                                 type="submit"
                         >
                             <?= e($studyModeLabel) ?>
+                        </button>
+                    </form>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($isPractice): ?>
+        <div class="mt-8 border-t border-slate-200 pt-8">
+            <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Answer Style</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-600">
+                Type each translation or select it from a list of possible answers.
+            </p>
+
+            <div class="mt-6 grid grid-cols-1 gap-3">
+                <?php foreach ($answerStyleOptions as $answerStyleValue => $answerStyleLabel): ?>
+                    <?php $isActive = $currentAnswerStyle === $answerStyleValue; ?>
+                    <form method="post" action="<?= e($context['answer_style_path']) ?>">
+                        <?= Csrf::input() ?>
+                        <input type="hidden" name="answer_style" value="<?= e($answerStyleValue) ?>">
+                        <button class="<?= $isActive ? 'btn-primary' : 'btn-secondary' ?> w-full justify-center" type="submit">
+                            <?= e($answerStyleLabel) ?>
                         </button>
                     </form>
                 <?php endforeach; ?>
@@ -738,7 +836,8 @@ $summaryLabel = $currentStudyMode === 'finite'
 		let frontCard = document.getElementById('study-card');
 		let backCard = document.getElementById('study-card-back');
 		const answerInput = document.getElementById('answer');
-        const checkButton = form.querySelector('button[type="submit"]');
+        const answerChoices = document.getElementById('answer-choices');
+        const checkButton = form.querySelector('[data-study-action-button="answer"]');
 		const skipButton = document.getElementById('skip-answer');
         const revealButton = document.getElementById('reveal-answer');
 		const history = document.getElementById('study-history');
@@ -756,6 +855,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 		const skipPath = form.dataset.skipPath;
 		const currentStudyMode = form.dataset.studyMode ?? 'infinite';
 		const currentTranslationMode = form.dataset.translationMode ?? 'bilingual';
+        const currentAnswerStyle = form.dataset.answerStyle ?? 'typing';
         const currentWrongMode = form.dataset.wrongMode ?? 'stay';
         let elapsedSeconds = Number(<?= json_encode($elapsedSeconds, JSON_THROW_ON_ERROR) ?>);
         const actionButtons = {
@@ -822,6 +922,10 @@ $summaryLabel = $currentStudyMode === 'finite'
                 button.classList.toggle('is-loading', loading && actionMode === mode);
                 button.setAttribute('aria-busy', loading && actionMode === mode ? 'true' : 'false');
             });
+
+            answerChoices?.querySelectorAll('[data-answer-choice]').forEach((button) => {
+                button.disabled = loading || frontCard.classList.contains('is-answer-revealed');
+            });
         };
 
         const clearRevealTimer = () => {
@@ -835,6 +939,22 @@ $summaryLabel = $currentStudyMode === 'finite'
             clearRevealTimer();
             answerInput.disabled = false;
             setActionLoading('answer', false);
+        };
+
+        const renderAnswerChoices = (studyCard) => {
+            if (!answerChoices) return;
+
+            answerChoices.replaceChildren();
+            (studyCard.choices ?? []).forEach((choice) => {
+                const button = document.createElement('button');
+                button.type = 'submit';
+                button.name = 'answer';
+                button.value = choice;
+                button.dataset.answerChoice = choice;
+                button.className = 'study-answer-choice';
+                button.textContent = choice;
+                answerChoices.appendChild(button);
+            });
         };
 
         const resetRevealState = () => {
@@ -1019,7 +1139,7 @@ $summaryLabel = $currentStudyMode === 'finite'
             setActionLoading(mode, true);
             let payloadIsComplete = false;
             const focusAnswerInput = () => {
-                if (payloadIsComplete) {
+                if (payloadIsComplete || currentAnswerStyle !== 'typing') {
                     return;
                 }
 
@@ -1075,14 +1195,24 @@ $summaryLabel = $currentStudyMode === 'finite'
 				if (mode !== 'skip' && !payload.result.correct && currentWrongMode === 'stay') {
 					frontCard.classList.add('is-wrong');
 					answerInput.value = '';
+					answerChoices?.querySelectorAll('[data-answer-choice]').forEach((button) => {
+						button.disabled = true;
+					});
 
 					setTimeout(() => {
 						frontCard.classList.remove('is-wrong');
+						answerChoices?.querySelectorAll('[data-answer-choice]').forEach((button) => {
+							button.disabled = false;
+						});
 						focusAnswerInput();
 					}, 760);
 
 					return;
 				}
+
+                answerChoices?.querySelectorAll('[data-answer-choice]').forEach((button) => {
+                    button.disabled = true;
+                });
 
 				if (!payload.summary.complete && payload.card) {
 					setCardContent(backCard, payload.card);
@@ -1122,6 +1252,7 @@ $summaryLabel = $currentStudyMode === 'finite'
 					backCard = outgoingCard;
 
                     frontCard.classList.remove('is-answer-revealed');
+					renderAnswerChoices(payload.card);
 					focusAnswerInput();
 				}, 520);
 			} catch (error) {
@@ -1134,6 +1265,15 @@ $summaryLabel = $currentStudyMode === 'finite'
 			await submitStudyAction('answer');
 		});
 
+        answerChoices?.addEventListener('click', async (event) => {
+            const choiceButton = event.target.closest('[data-answer-choice]');
+            if (!choiceButton || choiceButton.disabled) return;
+
+            event.preventDefault();
+            answerInput.value = choiceButton.dataset.answerChoice ?? '';
+            await submitStudyAction('answer');
+        });
+
 		skipButton?.addEventListener('click', async () => {
 			await submitStudyAction('skip');
 		});
@@ -1143,7 +1283,7 @@ $summaryLabel = $currentStudyMode === 'finite'
         });
 
         window.requestAnimationFrame(() => {
-            if (!answerInput.disabled) {
+            if (currentAnswerStyle === 'typing' && !answerInput.disabled) {
                 answerInput.focus();
             }
         });

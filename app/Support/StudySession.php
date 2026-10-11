@@ -14,6 +14,8 @@ final class StudySession
     public const STUDY_MODE_FINITE = 'finite';
     public const WRONG_MODE_STAY = 'stay';
     public const WRONG_MODE_ADVANCE = 'advance';
+    public const ANSWER_STYLE_TYPING = 'typing';
+    public const ANSWER_STYLE_CHOICES = 'choices';
 
     public function start(
         string $sessionKey,
@@ -21,7 +23,8 @@ final class StudySession
         string $mode = self::MODE_BILINGUAL,
         string $studyMode = self::STUDY_MODE_FINITE,
         string $wrongMode = self::WRONG_MODE_STAY,
-        bool $recordsProgress = true
+        bool $recordsProgress = true,
+        string $answerStyle = self::ANSWER_STYLE_TYPING
     ): void
     {
         $normalizedCards = $this->normalizeCards($cards);
@@ -31,6 +34,7 @@ final class StudySession
             'mode' => $this->normalizeMode($mode),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode($wrongMode),
+            'answer_style' => $this->normalizeAnswerStyle($answerStyle),
             'records_progress' => $recordsProgress,
             'started_at' => time(),
             'score' => 0,
@@ -89,6 +93,17 @@ final class StudySession
         return $this->normalizeWrongMode((string) ($session['wrong_mode'] ?? self::WRONG_MODE_STAY));
     }
 
+    public function answerStyle(string $sessionKey): string
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        if (!is_array($session)) {
+            return self::ANSWER_STYLE_TYPING;
+        }
+
+        return $this->normalizeAnswerStyle((string) ($session['answer_style'] ?? self::ANSWER_STYLE_TYPING));
+    }
+
     public function recordsProgress(string $sessionKey): bool
     {
         $session = $_SESSION[self::KEY][$sessionKey] ?? null;
@@ -137,7 +152,7 @@ final class StudySession
                     default => $this->inferAskForEnglish($session['current_card']),
                 };
 
-                $session['current_card'] = $this->buildCurrentCard($sourceCard, $askForEnglish);
+                $session['current_card'] = $this->buildCurrentCard($sourceCard, $askForEnglish, $session['cards'] ?? []);
             }
         }
 
@@ -164,6 +179,7 @@ final class StudySession
             'mode' => $this->normalizeMode((string) ($session['mode'] ?? self::MODE_BILINGUAL)),
             'study_mode' => $this->normalizeStudyMode($studyMode),
             'wrong_mode' => $this->normalizeWrongMode((string) ($session['wrong_mode'] ?? self::WRONG_MODE_STAY)),
+            'answer_style' => $this->normalizeAnswerStyle((string) ($session['answer_style'] ?? self::ANSWER_STYLE_TYPING)),
             'records_progress' => (bool) ($session['records_progress'] ?? true),
             'started_at' => time(),
             'score' => 0,
@@ -187,6 +203,18 @@ final class StudySession
         }
 
         $session['wrong_mode'] = $this->normalizeWrongMode($wrongMode);
+        $_SESSION[self::KEY][$sessionKey] = $session;
+    }
+
+    public function setAnswerStyle(string $sessionKey, string $answerStyle): void
+    {
+        $session = $_SESSION[self::KEY][$sessionKey] ?? null;
+
+        if (!is_array($session)) {
+            return;
+        }
+
+        $session['answer_style'] = $this->normalizeAnswerStyle($answerStyle);
         $_SESSION[self::KEY][$sessionKey] = $session;
     }
 
@@ -239,7 +267,7 @@ final class StudySession
                     continue;
                 }
 
-                $session['current_card'] = $this->buildCurrentCard($sourceCard, $direction === self::MODE_TO_ENGLISH);
+                $session['current_card'] = $this->buildCurrentCard($sourceCard, $direction === self::MODE_TO_ENGLISH, $session['cards']);
                 $_SESSION[self::KEY][$sessionKey] = $session;
                 return;
             }
@@ -410,7 +438,7 @@ final class StudySession
             default => random_int(0, 1) === 1,
         };
 
-        $session['current_card'] = $this->buildCurrentCard($sourceCard, $askForEnglish);
+        $session['current_card'] = $this->buildCurrentCard($sourceCard, $askForEnglish, $session['cards']);
         $_SESSION[self::KEY][$sessionKey] = $session;
     }
 
@@ -499,12 +527,14 @@ final class StudySession
         return max(0, time() - $startedAt);
     }
 
-    private function buildCurrentCard(array $sourceCard, bool $askForEnglish): array
+    private function buildCurrentCard(array $sourceCard, bool $askForEnglish, array $cards = []): array
     {
+        $expected = $askForEnglish ? $sourceCard['english_word'] : $sourceCard['language_word'];
+
         return [
             'id' => $sourceCard['id'],
             'prompt' => $askForEnglish ? $sourceCard['language_word'] : $sourceCard['english_word'],
-            'expected' => $askForEnglish ? $sourceCard['english_word'] : $sourceCard['language_word'],
+            'expected' => $expected,
             'accepted_answers' => $askForEnglish
                 ? self::acceptedAnswers($sourceCard['english_word'], $sourceCard['english_aliases'])
                 : self::acceptedAnswers($sourceCard['language_word'], $sourceCard['language_aliases']),
@@ -512,7 +542,28 @@ final class StudySession
             'answer_language' => $askForEnglish ? 'English' : 'Target',
             'translation_direction' => $askForEnglish ? self::MODE_TO_ENGLISH : self::MODE_TO_LANGUAGE,
             'set_name' => $sourceCard['set_name'],
+            'choices' => $this->buildChoices($cards, $expected, $askForEnglish),
         ];
+    }
+
+    private function buildChoices(array $cards, string $expected, bool $askForEnglish): array
+    {
+        $wordKey = $askForEnglish ? 'english_word' : 'language_word';
+        $distractors = [];
+
+        foreach ($cards as $card) {
+            $choice = self::normalize((string) ($card[$wordKey] ?? ''));
+
+            if ($choice !== '' && $choice !== $expected && !in_array($choice, $distractors, true)) {
+                $distractors[] = $choice;
+            }
+        }
+
+        shuffle($distractors);
+        $choices = [$expected, ...array_slice($distractors, 0, 3)];
+        shuffle($choices);
+
+        return $choices;
     }
 
     private function inferAskForEnglish(array $card): bool
@@ -573,5 +624,12 @@ final class StudySession
             self::WRONG_MODE_ADVANCE => self::WRONG_MODE_ADVANCE,
             default => self::WRONG_MODE_STAY,
         };
+    }
+
+    private function normalizeAnswerStyle(string $answerStyle): string
+    {
+        return $answerStyle === self::ANSWER_STYLE_CHOICES
+            ? self::ANSWER_STYLE_CHOICES
+            : self::ANSWER_STYLE_TYPING;
     }
 }

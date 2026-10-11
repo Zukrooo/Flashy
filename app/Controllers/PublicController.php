@@ -570,6 +570,8 @@ final class PublicController
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
                 'wrong_mode_path' => '/practice/set/' . $setId . '/wrong-mode',
+                'answer_style' => $this->studySession->answerStyle($sessionKey),
+                'answer_style_path' => '/practice/set/' . $setId . '/answer-style',
                 'reset_path' => '/practice/set/' . $setId . '/reset',
                 'restart_path' => '/practice/sets/' . $setId . '/start',
                 'finish_path' => '/sets/' . $setId,
@@ -618,6 +620,8 @@ final class PublicController
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
                 'wrong_mode_path' => $path . '/wrong-mode',
+                'answer_style' => $this->studySession->answerStyle($sessionKey),
+                'answer_style_path' => $path . '/answer-style',
                 'reset_path' => $path . '/reset',
                 'finish_path' => '/practice/languages/' . $languageId,
                 'is_practice' => true,
@@ -665,6 +669,8 @@ final class PublicController
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
                 'wrong_mode_path' => $path . '/wrong-mode',
+                'answer_style' => $this->studySession->answerStyle($sessionKey),
+                'answer_style_path' => $path . '/answer-style',
                 'reset_path' => $path . '/reset',
                 'finish_path' => '/practice/sets/' . $setId,
                 'is_practice' => true,
@@ -754,6 +760,8 @@ final class PublicController
                 'study_mode' => StudySession::STUDY_MODE_INFINITE,
                 'wrong_mode' => $this->studySession->wrongMode($sessionKey),
                 'wrong_mode_path' => '/practice/language/' . $languageId . '/all/wrong-mode',
+                'answer_style' => $this->studySession->answerStyle($sessionKey),
+                'answer_style_path' => '/practice/language/' . $languageId . '/all/answer-style',
                 'reset_path' => '/practice/language/' . $languageId . '/all/reset',
                 'restart_path' => '/practice/languages/' . $languageId . '/start-all',
                 'finish_path' => '/practice/languages/' . $languageId,
@@ -1220,6 +1228,12 @@ final class PublicController
         redirect('/practice/set/' . $setId);
     }
 
+    public function setAnswerStyleForPracticeSet(int $setId): void
+    {
+        $this->studySession->setAnswerStyle($this->practiceSetSessionKey($setId), (string) ($_POST['answer_style'] ?? StudySession::ANSWER_STYLE_TYPING));
+        redirect('/practice/set/' . $setId);
+    }
+
     public function setWrongModeForPracticeSmartSet(int $languageId, string $smartSet): void
     {
         $this->auth->requireUser();
@@ -1227,10 +1241,24 @@ final class PublicController
         redirect('/practice/language/' . $languageId . '/smart/' . $smartSet);
     }
 
+    public function setAnswerStyleForPracticeSmartSet(int $languageId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->setAnswerStyle($this->practiceSmartSessionKey($languageId, $smartSet), (string) ($_POST['answer_style'] ?? StudySession::ANSWER_STYLE_TYPING));
+        redirect('/practice/language/' . $languageId . '/smart/' . $smartSet);
+    }
+
     public function setWrongModeForPracticeSetSmartSet(int $setId, string $smartSet): void
     {
         $this->auth->requireUser();
         $this->studySession->setWrongMode($this->practiceSetSmartSessionKey($setId, $smartSet), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/set/' . $setId . '/smart/' . $smartSet);
+    }
+
+    public function setAnswerStyleForPracticeSetSmartSet(int $setId, string $smartSet): void
+    {
+        $this->auth->requireUser();
+        $this->studySession->setAnswerStyle($this->practiceSetSmartSessionKey($setId, $smartSet), (string) ($_POST['answer_style'] ?? StudySession::ANSWER_STYLE_TYPING));
         redirect('/practice/set/' . $setId . '/smart/' . $smartSet);
     }
 
@@ -1261,6 +1289,12 @@ final class PublicController
     public function setWrongModeForPracticeLanguageAll(int $languageId): void
     {
         $this->studySession->setWrongMode($this->practiceAllSessionKey($languageId), (string) ($_POST['wrong_mode'] ?? StudySession::WRONG_MODE_STAY));
+        redirect('/practice/language/' . $languageId . '/all');
+    }
+
+    public function setAnswerStyleForPracticeLanguageAll(int $languageId): void
+    {
+        $this->studySession->setAnswerStyle($this->practiceAllSessionKey($languageId), (string) ($_POST['answer_style'] ?? StudySession::ANSWER_STYLE_TYPING));
         redirect('/practice/language/' . $languageId . '/all');
     }
 

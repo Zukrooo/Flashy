@@ -308,6 +308,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/answer-style$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setAnswerStyleForPracticeSet((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/set/(\d+)/smart/([a-z-]+)/mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setModeForSetSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
@@ -315,6 +320,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/smart/([a-z-]+)/mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setModeForPracticeSetSmartSet((int) $matches[1], $matches[2]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/set/(\d+)/smart/([a-z-]+)/answer-style$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setAnswerStyleForPracticeSetSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
     }
 
@@ -393,6 +403,11 @@ try {
         return;
     }
 
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/all/answer-style$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setAnswerStyleForPracticeLanguageAll((int) $matches[1]), false, true);
+        return;
+    }
+
     if ($method === 'POST' && preg_match('#^/study/language/(\d+)/smart/([a-z-]+)/mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setModeForSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
@@ -415,6 +430,11 @@ try {
 
     if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/smart/([a-z-]+)/wrong-mode$#', $path, $matches) === 1) {
         $dispatch(static fn () => $publicController->setWrongModeForPracticeSmartSet((int) $matches[1], $matches[2]), false, true);
+        return;
+    }
+
+    if ($method === 'POST' && preg_match('#^/practice/language/(\d+)/smart/([a-z-]+)/answer-style$#', $path, $matches) === 1) {
+        $dispatch(static fn () => $publicController->setAnswerStyleForPracticeSmartSet((int) $matches[1], $matches[2]), false, true);
         return;
     }
 
